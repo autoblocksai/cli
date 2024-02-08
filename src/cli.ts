@@ -4,6 +4,11 @@ import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { handlers } from './handlers/index.js';
 
+const errorMessage = `No command found. Provide a command following '--'. For example:
+
+npx autoblocks testing exec -- echo "Hello, world!
+`;
+
 yargs(hideBin(process.argv))
   .command(
     'testing exec',
@@ -30,15 +35,28 @@ yargs(hideBin(process.argv))
         .help();
     },
     (argv) => {
-      const [command, ...args] = argv._.slice(1).map(String);
+      const unparsed = argv['--'];
+      if (!Array.isArray(unparsed)) {
+        throw new Error(errorMessage);
+      }
+
+      const [command, ...commandArgs] = unparsed.map(String);
+
+      if (!command) {
+        throw new Error(errorMessage);
+      }
 
       handlers.testing.exec({
         command,
-        commandArgs: args,
+        commandArgs,
         runMessage: argv.message,
         port: argv.port,
         interactive: argv.interactive,
       });
     },
   )
+  // Populates `argv['--']` with the unparsed arguments after --
+  .parserConfiguration({
+    'populate--': true,
+  })
   .parse();
