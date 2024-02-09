@@ -6,6 +6,32 @@ import crypto from 'crypto';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { startInteractiveCLI, interactiveEmitter } from './interactive-cli';
+import net from 'net';
+
+function findAvailablePort(startPort: number): Promise<number> {
+  return new Promise((resolve, reject) => {
+    function tryListening(port: number) {
+      const server = net.createServer();
+
+      server.listen(port, () => {
+        server.once('close', () => {
+          resolve(port);
+        });
+        server.close();
+      });
+
+      server.on('error', (err) => {
+        if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
+          tryListening(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+    }
+
+    tryListening(startPort);
+  });
+}
 
 /**
  * Current run utils
@@ -226,13 +252,15 @@ export async function exec(args: {
 
   let server: ServerType | undefined = undefined;
 
+  const port = await findAvailablePort(args.port);
+
   server = serve(
     {
       fetch: app.fetch,
-      port: args.port,
+      port,
     },
-    () => {
-      const serverAddress = `http://localhost:${args.port}`;
+    (addressInfo) => {
+      const serverAddress = `http://localhost:${addressInfo.port}`;
 
       // Set environment variables for the SDKs to use
       const env = {
