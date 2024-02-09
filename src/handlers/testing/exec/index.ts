@@ -7,8 +7,6 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { startInteractiveCLI, interactiveEmitter } from './interactive-cli';
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /**
  * Current run utils
  */
@@ -36,6 +34,13 @@ interface TestCaseEvent {
 }
 
 const testCaseEvents: TestCaseEvent[] = [];
+
+/**
+ * Keep a map of test case hashes to their result IDs
+ *
+ * runId -> testId -> testCaseHash -> testCaseResultId
+ */
+const testCaseHashToResultId: Record<string, Record<string, string>> = {};
 
 /**
  * Eval utils
@@ -78,14 +83,15 @@ async function postTestCaseResult(args: {
   testCaseBody?: unknown;
   testCaseOutput?: unknown;
   testCaseEvents: TestCaseEvent[];
-}): Promise<void> {
+}): Promise<{ testCaseResultId: string }> {
   const runId = await currentRunId();
   console.log(`POST /api/testing/local/runs/${runId}/results`, args);
+  return { testCaseResultId: crypto.randomUUID() };
 }
 
 async function postTestCaseEval(args: {
   testId: string;
-  testCaseHash: string;
+  testCaseResultId: string;
   evaluatorId: string;
   score: number;
   passed: boolean | undefined;
@@ -93,7 +99,6 @@ async function postTestCaseEval(args: {
   thresholdValue?: number;
 }): Promise<void> {
   const runId = await currentRunId();
-  await sleep(1000);
   // TODO: use enums, zod schemas for passing this data to the interactive CLI
   interactiveEmitter.emit('eval', { ...args, runId });
   console.log(`POST /api/testing/local/runs/${runId}/evals`, args);
@@ -137,13 +142,20 @@ app.post(
   ),
   async (c) => {
     const data = c.req.valid('json');
+
     const events = testCaseEvents.filter(
       (e) => e.testId === data.testId && e.testCaseHash === data.testCaseHash,
     );
-    await postTestCaseResult({
+    const { testCaseResultId } = await postTestCaseResult({
       ...data,
       testCaseEvents: events,
     });
+
+    if (!testCaseHashToResultId[data.testId]) {
+      testCaseHashToResultId[data.testId] = {};
+    }
+
+    testCaseHashToResultId[data.testId][data.testCaseHash] = testCaseResultId;
 
     return c.json('ok');
   },
@@ -174,8 +186,19 @@ app.post(
       });
     }
 
+    const testCaseResultId =
+      testCaseHashToResultId[data.testId]?.[data.testCaseHash];
+
+    if (!testCaseResultId) {
+      console.warn(
+        `No corresponding test case result ID for test case hash ${data.testCaseHash}`,
+      );
+      return;
+    }
+
     await postTestCaseEval({
       ...data,
+      testCaseResultId,
       passed,
     });
 
