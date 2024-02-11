@@ -107,7 +107,7 @@ async def evaluate_output(
     )
 
   await client.post("/evals", json=dict(
-    testId=id,
+    testExternalId=id,
     testCaseHash=test_case.hash,
     evaluatorId=evaluator.id,
     score=evaluation.score,
@@ -132,7 +132,7 @@ async def run_test_case(
     output = await loop.run_in_executor(None, ctx.run, fn, test_case)
 
   await client.post("/results", json=dict(
-    testId=test_id,
+    testExternalId=test_id,
     testCaseHash=test_case.hash,
     testCaseBody=dataclasses.asdict(test_case),
     testCaseOutput=output,
@@ -170,6 +170,8 @@ async def run_test(
   ]
   await asyncio.gather(*run_tasks)
 
+  await client.post("/end", json=dict(testExternalId=test_id))
+
 
 # Sync entrypoint
 def test(
@@ -186,11 +188,11 @@ def test(
       fn=fn,
     ),
     loop,
- )
+  )
   future.result()
 
 
-
+# Example usage
 if __name__ == "__main__":
   import random
 

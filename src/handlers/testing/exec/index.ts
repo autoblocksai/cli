@@ -8,6 +8,9 @@ import { z } from 'zod';
 import { startInteractiveCLI, interactiveEmitter } from './interactive-cli';
 import net from 'net';
 
+/**
+ * Utils
+ */
 function findAvailablePort(startPort: number): Promise<number> {
   return new Promise((resolve, reject) => {
     function tryListening(port: number) {
@@ -34,20 +37,29 @@ function findAvailablePort(startPort: number): Promise<number> {
 }
 
 /**
- * Current run utils
+ * Globals
  */
-let _currentRunId: string | undefined = undefined;
 let _currentRunMessage: string | undefined = undefined;
 let _isInteractive: boolean | undefined = undefined;
 
-async function currentRunId(): Promise<string> {
-  if (!_currentRunId) {
-    const run = await startRun();
-    _currentRunId = run.runId;
+// Map of test's external ID to its current run ID and its internal test ID
+const testExternalIdToRun: Record<string, { runId: string; testId: string }> =
+  {};
+
+async function currentRun(args: {
+  testExternalId: string;
+}): Promise<{ runId: string; testId: string }> {
+  let run = testExternalIdToRun[args.testExternalId];
+  if (!run) {
+    run = await startRun({ testExternalId: args.testExternalId });
+    testExternalIdToRun[args.testExternalId] = run;
   }
-  return _currentRunId;
+  return run;
 }
 
+/**
+ * Logger
+ */
 const logger = {
   log: (...args: unknown[]) => {
     if (_isInteractive) {
@@ -71,7 +83,7 @@ const logger = {
  * Accumulate events for the duration of the run
  */
 interface TestCaseEvent {
-  testId: string;
+  testExternalId: string;
   testCaseHash: string;
   message: string;
   traceId: string;
@@ -84,7 +96,7 @@ const testCaseEvents: TestCaseEvent[] = [];
 /**
  * Keep a map of test case hashes to their result IDs
  *
- * runId -> testId -> testCaseHash -> testCaseResultId
+ * testExternalId -> testCaseHash -> testCaseResultId
  */
 const testCaseHashToResultId: Record<string, Record<string, string>> = {};
 
@@ -111,32 +123,40 @@ function evaluationPassed(args: {
 /**
  * Public API stubs
  */
-async function startRun(): Promise<{ runId: string }> {
-  logger.log('POST /api/testing/local/runs', { message: _currentRunMessage });
-  return { runId: crypto.randomUUID() };
+async function startRun(args: {
+  testExternalId: string;
+}): Promise<{ runId: string; testId: string }> {
+  logger.log('POST /api/testing/local/runs', {
+    testExternalId: args.testExternalId,
+    message: _currentRunMessage,
+  });
+  return { runId: crypto.randomUUID(), testId: crypto.randomUUID() };
 }
 
-async function endRun(): Promise<void> {
-  const runId = await currentRunId();
+async function endRun(args: { testExternalId: string }): Promise<void> {
+  const { runId } = await currentRun(args);
   logger.log(`POST /api/testing/local/runs/${runId}/end`);
-  interactiveEmitter.emit('end');
-  _currentRunId = undefined;
+  interactiveEmitter.emit('end', { testExternalId: args.testExternalId });
+  delete testExternalIdToRun[args.testExternalId];
 }
 
 async function postTestCaseResult(args: {
-  testId: string;
+  testExternalId: string;
   testCaseHash: string;
   testCaseBody?: unknown;
   testCaseOutput?: unknown;
   testCaseEvents: TestCaseEvent[];
 }): Promise<{ testCaseResultId: string }> {
-  const runId = await currentRunId();
-  logger.log(`POST /api/testing/local/runs/${runId}/results`, args);
+  const { runId, testId } = await currentRun(args);
+  logger.log(`POST /api/testing/local/runs/${runId}/results`, {
+    ...args,
+    testId,
+  });
   return { testCaseResultId: crypto.randomUUID() };
 }
 
 async function postTestCaseEval(args: {
-  testId: string;
+  testExternalId: string;
   testCaseResultId: string;
   evaluatorId: string;
   score: number;
@@ -144,10 +164,13 @@ async function postTestCaseEval(args: {
   thresholdOp?: '<' | '<=' | '>' | '>=';
   thresholdValue?: number;
 }): Promise<void> {
-  const runId = await currentRunId();
+  const { runId, testId } = await currentRun(args);
   // TODO: use enums, zod schemas for passing this data to the interactive CLI
-  interactiveEmitter.emit('eval', { ...args, runId });
-  logger.log(`POST /api/testing/local/runs/${runId}/evals`, args);
+  interactiveEmitter.emit('eval', args);
+  logger.log(`POST /api/testing/local/runs/${runId}/evals`, {
+    ...args,
+    testId,
+  });
 }
 
 /**
@@ -160,7 +183,7 @@ app.post(
   zValidator(
     'json',
     z.object({
-      testId: z.string(),
+      testExternalId: z.string(),
       testCaseHash: z.string(),
       message: z.string(),
       traceId: z.string(),
@@ -180,7 +203,7 @@ app.post(
   zValidator(
     'json',
     z.object({
-      testId: z.string(),
+      testExternalId: z.string(),
       testCaseHash: z.string(),
       testCaseBody: z.unknown(),
       testCaseOutput: z.unknown(),
@@ -190,18 +213,21 @@ app.post(
     const data = c.req.valid('json');
 
     const events = testCaseEvents.filter(
-      (e) => e.testId === data.testId && e.testCaseHash === data.testCaseHash,
+      (e) =>
+        e.testExternalId === data.testExternalId &&
+        e.testCaseHash === data.testCaseHash,
     );
     const { testCaseResultId } = await postTestCaseResult({
       ...data,
       testCaseEvents: events,
     });
 
-    if (!testCaseHashToResultId[data.testId]) {
-      testCaseHashToResultId[data.testId] = {};
+    if (!testCaseHashToResultId[data.testExternalId]) {
+      testCaseHashToResultId[data.testExternalId] = {};
     }
 
-    testCaseHashToResultId[data.testId][data.testCaseHash] = testCaseResultId;
+    testCaseHashToResultId[data.testExternalId][data.testCaseHash] =
+      testCaseResultId;
 
     return c.json('ok');
   },
@@ -212,7 +238,7 @@ app.post(
   zValidator(
     'json',
     z.object({
-      testId: z.string(),
+      testExternalId: z.string(),
       testCaseHash: z.string(),
       evaluatorId: z.string(),
       score: z.number(),
@@ -233,7 +259,7 @@ app.post(
     }
 
     const testCaseResultId =
-      testCaseHashToResultId[data.testId]?.[data.testCaseHash];
+      testCaseHashToResultId[data.testExternalId]?.[data.testCaseHash];
 
     if (!testCaseResultId) {
       logger.warn(
@@ -249,6 +275,21 @@ app.post(
     });
 
     return c.json({ passed });
+  },
+);
+
+app.post(
+  '/end',
+  zValidator(
+    'json',
+    z.object({
+      testExternalId: z.string(),
+    }),
+  ),
+  async (c) => {
+    const data = c.req.valid('json');
+    await endRun(data);
+    return c.json('ok');
   },
 );
 
@@ -294,7 +335,6 @@ export async function exec(args: {
         env,
         silent: args.interactive,
       }).finally(async () => {
-        await endRun();
         server?.close();
       });
     },
