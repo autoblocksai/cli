@@ -10,6 +10,9 @@ const config = {
   ],
   rules: {
     'prettier/prettier': 'error',
+    // Console logging interferes with ink's output,
+    // so logging should go through the dedicated logger.
+    'no-console': 'error',
   },
   ignorePatterns: ['dist/**'],
 };

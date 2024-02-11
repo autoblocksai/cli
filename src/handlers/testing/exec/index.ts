@@ -38,6 +38,7 @@ function findAvailablePort(startPort: number): Promise<number> {
  */
 let _currentRunId: string | undefined = undefined;
 let _currentRunMessage: string | undefined = undefined;
+let _isInteractive: boolean | undefined = undefined;
 
 async function currentRunId(): Promise<string> {
   if (!_currentRunId) {
@@ -46,6 +47,25 @@ async function currentRunId(): Promise<string> {
   }
   return _currentRunId;
 }
+
+const logger = {
+  log: (...args: unknown[]) => {
+    if (_isInteractive) {
+      interactiveEmitter.emit('logging.log', args);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(...args);
+    }
+  },
+  warn: (...args: unknown[]) => {
+    if (_isInteractive) {
+      interactiveEmitter.emit('logging.warn', args);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(...args);
+    }
+  },
+};
 
 /**
  * Accumulate events for the duration of the run
@@ -92,13 +112,13 @@ function evaluationPassed(args: {
  * Public API stubs
  */
 async function startRun(): Promise<{ runId: string }> {
-  console.log('POST /api/testing/local/runs', { message: _currentRunMessage });
+  logger.log('POST /api/testing/local/runs', { message: _currentRunMessage });
   return { runId: crypto.randomUUID() };
 }
 
 async function endRun(): Promise<void> {
   const runId = await currentRunId();
-  console.log(`POST /api/testing/local/runs/${runId}/end`);
+  logger.log(`POST /api/testing/local/runs/${runId}/end`);
   interactiveEmitter.emit('end');
   _currentRunId = undefined;
 }
@@ -111,7 +131,7 @@ async function postTestCaseResult(args: {
   testCaseEvents: TestCaseEvent[];
 }): Promise<{ testCaseResultId: string }> {
   const runId = await currentRunId();
-  console.log(`POST /api/testing/local/runs/${runId}/results`, args);
+  logger.log(`POST /api/testing/local/runs/${runId}/results`, args);
   return { testCaseResultId: crypto.randomUUID() };
 }
 
@@ -127,7 +147,7 @@ async function postTestCaseEval(args: {
   const runId = await currentRunId();
   // TODO: use enums, zod schemas for passing this data to the interactive CLI
   interactiveEmitter.emit('eval', { ...args, runId });
-  console.log(`POST /api/testing/local/runs/${runId}/evals`, args);
+  logger.log(`POST /api/testing/local/runs/${runId}/evals`, args);
 }
 
 /**
@@ -216,7 +236,7 @@ app.post(
       testCaseHashToResultId[data.testId]?.[data.testCaseHash];
 
     if (!testCaseResultId) {
-      console.warn(
+      logger.warn(
         `No corresponding test case result ID for test case hash ${data.testCaseHash}`,
       );
       return;
@@ -247,6 +267,7 @@ export async function exec(args: {
   }
 
   if (args.interactive) {
+    _isInteractive = true;
     startInteractiveCLI();
   }
 
