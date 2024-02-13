@@ -16,6 +16,7 @@ from typing import Any
 from typing import List
 from typing import Optional
 from typing import Callable
+from typing import Coroutine
 
 
 # Models
@@ -78,6 +79,18 @@ background_thread = threading.Thread(
 background_thread.start()
 
 
+async def gather_with_concurrency(n: int, *coros: List[Coroutine]):
+    """
+    Borrowed from https://stackoverflow.com/a/61478547
+    """
+    semaphore = asyncio.Semaphore(n)
+
+    async def sem_coro(coro: Coroutine):
+        async with semaphore:
+            return await coro
+    return await asyncio.gather(*(sem_coro(c) for c in coros))
+
+
 async def evaluate_output(
   id: str,
   test_case: str,
@@ -111,6 +124,7 @@ async def run_test_case(
   test_case: BaseTestCase,
   evaluators: List[BaseEvaluator],
   fn: Callable[[BaseTestCase], Any],
+  max_evaluator_concurrency: int,
 ):
   current_test_id_var.set(test_id)
   current_test_case_var.set(test_case)
@@ -128,18 +142,14 @@ async def run_test_case(
     testCaseOutput=output,
   ))
 
-  eval_tasks = [
-    asyncio.create_task(
-      evaluate_output(
-        id=test_id,
-        test_case=test_case,
-        output=output,
-        evaluator=evaluator,
-      )
+  await gather_with_concurrency(max_evaluator_concurrency, *[
+    evaluate_output(
+      id=test_id,
+      test_case=test_case,
+      output=output,
+      evaluator=evaluator,
     ) for evaluator in evaluators
-  ]
-
-  await asyncio.gather(*eval_tasks)
+  ])
 
 
 async def run_test(
@@ -147,20 +157,20 @@ async def run_test(
   test_cases: List[BaseTestCase],
   evaluators: List[BaseEvaluator],
   fn: Callable[[BaseTestCase], Any],
+  max_test_case_concurrency: int,
+  max_evaluator_concurrency: int,
 ):
   await client.post("/start", json=dict(testExternalId=test_id))
 
-  run_tasks = [
-    asyncio.create_task(
-      run_test_case(
-        test_id=test_id,
-        test_case=test_case,
-        evaluators=evaluators,
-        fn=fn,
-      ),
+  await gather_with_concurrency(max_test_case_concurrency, *[
+    run_test_case(
+      test_id=test_id,
+      test_case=test_case,
+      evaluators=evaluators,
+      fn=fn,
+      max_evaluator_concurrency=max_evaluator_concurrency,
     ) for test_case in test_cases
-  ]
-  await asyncio.gather(*run_tasks)
+  ])
 
   await client.post("/end", json=dict(testExternalId=test_id))
 
@@ -171,6 +181,10 @@ def test(
   test_cases: List[BaseTestCase],
   evaluators: List[BaseEvaluator],
   fn: Callable[[BaseTestCase], Any],
+  # How many test cases to run concurrently
+  max_test_case_concurrency: int = 10,
+  # How many evaluators to run concurrently on the result of a test case
+  max_evaluator_concurrency: int = 5,
 ):
   future = asyncio.run_coroutine_threadsafe(
     run_test(
@@ -178,6 +192,8 @@ def test(
       test_cases=test_cases,
       evaluators=evaluators,
       fn=fn,
+      max_test_case_concurrency=max_test_case_concurrency,
+      max_evaluator_concurrency=max_evaluator_concurrency,
     ),
     loop,
   )
@@ -241,6 +257,24 @@ if __name__ == "__main__":
           value=1,
         ),
       )
+    
+  class MinimumLength(BaseEvaluator):
+    id = "minimum-length"
+
+    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      # Simulate doing work
+      time.sleep(random.random() * 3)
+
+      # Simulate random failures
+      score = random.choice([0, 1])
+
+      return Evaluation(
+        score=score,
+        threshold=Threshold(
+          op=ThresholdOp.GTE,
+          value=1,
+        ),
+      )
 
 
   def reverser_fn(test_case: TestCase) -> str:
@@ -250,33 +284,39 @@ if __name__ == "__main__":
     # Reverse the string
     return test_case.input[::-1]
 
-  test_cases = []
-  for _ in range(20):
-    input = str(uuid.uuid4())
-    test_cases.append(
-      TestCase(
-        input=input,
-        expected_output=input[::-1],
-        expected_substrings=input[::-1].split("-"),
-      ),
-    )
+
+  def gen_test_cases(num: int) -> List[TestCase]:
+    test_cases = []
+    for _ in range(num):
+      input = str(uuid.uuid4())
+      test_cases.append(
+        TestCase(
+          input=input,
+          expected_output=input[::-1],
+          expected_substrings=input[::-1].split("-"),
+        ),
+      )
+    return test_cases
+
 
   test(
     id="reverser-bot-1",
-    test_cases=test_cases,
+    test_cases=gen_test_cases(12),
     evaluators=[
       Equality(),
       HasSubstrings(),
     ],
     fn=reverser_fn,
+    max_test_case_concurrency=3,
   )
 
   test(
     id="reverser-bot-2",
-    test_cases=test_cases,
+    test_cases=gen_test_cases(29),
     evaluators=[
       Equality(),
-      HasSubstrings(),
+      MinimumLength(),
     ],
     fn=reverser_fn,
+    max_test_case_concurrency=12,
   )
