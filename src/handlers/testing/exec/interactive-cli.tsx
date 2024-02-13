@@ -2,48 +2,93 @@ import { EventEmitter } from 'events';
 import { Box, Text, render, useInput, Spacer } from 'ink';
 import Spinner from 'ink-spinner';
 import React, { useEffect, useState } from 'react';
+import Link from 'ink-link';
+
+interface Evaluation {
+  testExternalId: string;
+  evaluatorExternalId: string;
+  testCaseHash: string;
+  passed: boolean | undefined;
+}
+
+/**
+ * Uses add() to ensure that the set is ordered by insertion order
+ *
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
+ */
+function makeOrdereredSet(vals: string[]): Set<string> {
+  const set = new Set<string>();
+  vals.forEach((val) => set.add(val));
+  return set;
+}
 
 export const interactiveEmitter = new EventEmitter();
 
 const Space = () => <Text> </Text>;
 
-function TestOutcomes(props: {
+function TestRow(props: {
   runIsOver: boolean;
   testExternalId: string;
-  outcomes: boolean[];
+  evals: Evaluation[];
 }) {
-  const passed = props.outcomes.every((x) => x);
+  const uniqEvaluatorExternalIds = makeOrdereredSet(
+    props.evals.map((e) => e.evaluatorExternalId),
+  );
+  const uniqTestCaseHashes = makeOrdereredSet(
+    props.evals.map((e) => e.testCaseHash),
+  );
+
+  const testDidPassOverall = props.evals.every((e) => e.passed !== false);
   return (
-    <Box alignItems="center">
-      {props.runIsOver ? (
-        <Text color="white" backgroundColor={passed ? 'green' : 'red'}>
-          <Space />
-          {passed ? 'PASSED' : 'FAILED'}
-          <Space />
-        </Text>
-      ) : (
-        <Spinner type="dots" />
-      )}
-      <Space />
-      <Text bold={true}>{props.testExternalId}</Text>
-      <Space />
-      {props.outcomes.map((passed, i) => (
-        <Text key={i} color={passed ? 'green' : 'red'}>
-          {'.'}
-        </Text>
-      ))}
-      <Spacer />
-      <Box borderStyle="single">
-        <Text>Rerun</Text>
+    <Box flexDirection="column">
+      <Box>
+        {props.runIsOver ? (
+          <Text color={testDidPassOverall ? 'green' : 'red'}>
+            {testDidPassOverall ? '✓' : '✗'}
+          </Text>
+        ) : (
+          <Spinner type="dots" />
+        )}
+        <Space />
+        <Text bold={true}>{props.testExternalId}</Text>
+        <Spacer />
+        <Link
+          url={`https://app.autoblocks.ai/testing/local/tests/${encodeURIComponent(props.testExternalId)}`}
+        >
+          View
+        </Link>
       </Box>
+      {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
+        return (
+          <Box key={evaluatorExternalId} paddingLeft={2} alignItems="center">
+            <Text color="gray">{evaluatorExternalId}</Text>
+            <Space />
+            {Array.from(uniqTestCaseHashes).map((testCaseHash) => {
+              const passed = props.evals.find(
+                (e) =>
+                  e.evaluatorExternalId === evaluatorExternalId &&
+                  e.testCaseHash === testCaseHash,
+              )?.passed;
+              return (
+                <Text
+                  key={testCaseHash}
+                  color={
+                    passed == undefined ? 'gray' : passed ? 'green' : 'red'
+                  }
+                >
+                  {'.'}
+                </Text>
+              );
+            })}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
 
 const App = () => {
-  const [testIdToOutcomes, setTestIdToOutcomes] = useState<
-    Record<string, boolean[]>
-  >({});
+  const [evals, setEvals] = useState<Evaluation[]>([]);
   const [testIdToRunIsOver, setTestIdToRunIsOver] = useState<
     Record<string, boolean>
   >({});
@@ -53,16 +98,9 @@ const App = () => {
   });
 
   useEffect(() => {
-    const evalListener = (args: {
-      testExternalId: string;
-      passed: boolean;
-    }) => {
-      setTestIdToOutcomes((prevOutcomes) => {
-        const { testExternalId, passed } = args;
-        return {
-          ...prevOutcomes,
-          [testExternalId]: [...(prevOutcomes[testExternalId] || []), passed],
-        };
+    const evalListener = (e: Evaluation) => {
+      setEvals((prevEvals) => {
+        return [...prevEvals, e];
       });
     };
 
@@ -81,6 +119,10 @@ const App = () => {
     };
   }, []);
 
+  const uniqTestExternalIds = makeOrdereredSet(
+    evals.map((e) => e.testExternalId),
+  );
+
   return (
     <Box
       paddingX={1}
@@ -89,14 +131,19 @@ const App = () => {
       borderColor="gray"
       minHeight={12}
     >
-      {Object.entries(testIdToOutcomes).map(([testId, outcomes]) => (
-        <TestOutcomes
-          key={testId}
-          runIsOver={testIdToRunIsOver[testId]}
-          testExternalId={testId}
-          outcomes={outcomes}
-        />
-      ))}
+      {Array.from(uniqTestExternalIds).map((testExternalId) => {
+        const testEvals = evals.filter(
+          (e) => e.testExternalId === testExternalId,
+        );
+        return (
+          <TestRow
+            key={testExternalId}
+            runIsOver={testIdToRunIsOver[testExternalId]}
+            testExternalId={testExternalId}
+            evals={testEvals}
+          />
+        );
+      })}
     </Box>
   );
 };

@@ -198,10 +198,27 @@ def test(
 if __name__ == "__main__":
   import random
 
-  class Equality(BaseEvaluator):
-    id = "equality"
+
+  class Equality1(BaseEvaluator):
+    id = "equality-1"
 
     def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      time.sleep(random.random() * 3)
+      score = 1 if output == test_case.expected_output else 0
+      return Evaluation(
+        score=score,
+        threshold=Threshold(
+          op=ThresholdOp.GTE,
+          value=1,
+        )
+      )
+
+
+  class Equality2(BaseEvaluator):
+    id = "equality-2"
+
+    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      time.sleep(random.random() * 3)
       score = 1 if output == test_case.expected_output else 0
       return Evaluation(
         score=score,
@@ -234,7 +251,8 @@ if __name__ == "__main__":
     id="reverser-bot-1",
     test_cases=test_cases,
     evaluators=[
-      Equality(),
+      Equality1(),
+      Equality2(),
     ],
     fn=my_fn,
   )
@@ -243,7 +261,8 @@ if __name__ == "__main__":
     id="reverser-bot-2",
     test_cases=test_cases,
     evaluators=[
-      Equality(),
+      Equality1(),
+      Equality2(),
     ],
     fn=my_fn,
   )
