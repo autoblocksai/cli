@@ -58,31 +58,42 @@ function TestRow(props: {
           View
         </Link>
       </Box>
-      {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
-        return (
-          <Box key={evaluatorExternalId} paddingLeft={2} alignItems="center">
-            <Text color="gray">{evaluatorExternalId}</Text>
-            <Space />
-            {Array.from(uniqTestCaseHashes).map((testCaseHash) => {
-              const passed = props.evals.find(
-                (e) =>
-                  e.evaluatorExternalId === evaluatorExternalId &&
-                  e.testCaseHash === testCaseHash,
-              )?.passed;
-              return (
-                <Text
-                  key={testCaseHash}
-                  color={
-                    passed == undefined ? 'gray' : passed ? 'green' : 'red'
-                  }
-                >
-                  {'.'}
-                </Text>
-              );
-            })}
-          </Box>
-        );
-      })}
+      <Box alignItems="center" paddingLeft={2}>
+        <Box flexDirection="column" paddingRight={1}>
+          {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
+            return (
+              <Text key={evaluatorExternalId} color="gray">
+                {evaluatorExternalId}
+              </Text>
+            );
+          })}
+        </Box>
+        <Box flexDirection="column">
+          {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
+            return (
+              <Box key={evaluatorExternalId}>
+                {Array.from(uniqTestCaseHashes).map((testCaseHash) => {
+                  const passed = props.evals.find(
+                    (e) =>
+                      e.evaluatorExternalId === evaluatorExternalId &&
+                      e.testCaseHash === testCaseHash,
+                  )?.passed;
+                  return (
+                    <Text
+                      key={testCaseHash}
+                      color={
+                        passed == undefined ? 'gray' : passed ? 'green' : 'red'
+                      }
+                    >
+                      {'.'}
+                    </Text>
+                  );
+                })}
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
     </Box>
   );
 }

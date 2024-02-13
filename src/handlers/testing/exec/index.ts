@@ -351,8 +351,8 @@ function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
-        testCaseHash: z.string(),
         evaluatorExternalId: z.string(),
+        testCaseHash: z.string(),
         score: z.number(),
         thresholdOp: z.enum(['<', '<=', '>', '>=']).optional(),
         thresholdValue: z.number().optional(),

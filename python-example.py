@@ -53,16 +53,6 @@ class BaseEvaluator(abc.ABC):
   @abc.abstractmethod
   def evaluate(self, test_case: BaseTestCase, output: Any) -> Evaluation:
     pass
-
-
-@dataclasses.dataclass(frozen=True)
-class TestCase(BaseTestCase):
-  input: str
-  expected_output: str
-
-  @functools.cached_property
-  def hash(self) -> str:
-    return hashlib.md5(self.input.encode()).hexdigest()
   
 
 # Run utils
@@ -108,8 +98,8 @@ async def evaluate_output(
 
   await client.post("/evals", json=dict(
     testExternalId=id,
-    testCaseHash=test_case.hash,
     evaluatorExternalId=evaluator.id,
+    testCaseHash=test_case.hash,
     score=evaluation.score,
     thresholdOp=evaluation.threshold.op.value if evaluation.threshold else None,
     thresholdValue=evaluation.threshold.value if evaluation.threshold else None,
@@ -118,9 +108,9 @@ async def evaluate_output(
 
 async def run_test_case(
   test_id: str,
-  test_case: TestCase,
+  test_case: BaseTestCase,
   evaluators: List[BaseEvaluator],
-  fn: Callable[[TestCase], Any],
+  fn: Callable[[BaseTestCase], Any],
 ):
   current_test_id_var.set(test_id)
   current_test_case_var.set(test_case)
@@ -154,9 +144,9 @@ async def run_test_case(
 
 async def run_test(
   test_id: str,
-  test_cases: List[TestCase],
+  test_cases: List[BaseTestCase],
   evaluators: List[BaseEvaluator],
-  fn: Callable[[TestCase], Any],
+  fn: Callable[[BaseTestCase], Any],
 ):
   await client.post("/start", json=dict(testExternalId=test_id))
 
@@ -178,9 +168,9 @@ async def run_test(
 # Sync entrypoint
 def test(
   id: str,
-  test_cases: List[TestCase],
+  test_cases: List[BaseTestCase],
   evaluators: List[BaseEvaluator],
-  fn: Callable[[TestCase], Any],
+  fn: Callable[[BaseTestCase], Any],
 ):
   future = asyncio.run_coroutine_threadsafe(
     run_test(
@@ -194,75 +184,99 @@ def test(
   future.result()
 
 
+
+
+
+
+
 # Example usage
 if __name__ == "__main__":
   import random
 
 
-  class Equality1(BaseEvaluator):
-    id = "equality-1"
+  @dataclasses.dataclass(frozen=True)
+  class TestCase(BaseTestCase):
+    input: str
+    expected_output: str
+    expected_substrings: List[str]
+
+    @functools.cached_property
+    def hash(self) -> str:
+      return hashlib.md5(self.input.encode()).hexdigest()
+
+
+  class Equality(BaseEvaluator):
+    id = "equality"
 
     def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      # Simulate doing work
       time.sleep(random.random() * 3)
-      score = 1 if output == test_case.expected_output else 0
+
+      # Simulate random failures
+      score = random.choice([0, 1])
+
       return Evaluation(
         score=score,
         threshold=Threshold(
           op=ThresholdOp.GTE,
           value=1,
-        )
+        ),
       )
 
 
-  class Equality2(BaseEvaluator):
-    id = "equality-2"
+  class HasSubstrings(BaseEvaluator):
+    id = "has-substrings"
 
     def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      # Simulate doing work
       time.sleep(random.random() * 3)
-      score = 1 if output == test_case.expected_output else 0
+
+      # Simulate random failures
+      score = random.choice([0, 1])
+
       return Evaluation(
         score=score,
         threshold=Threshold(
           op=ThresholdOp.GTE,
           value=1,
-        )
+        ),
       )
 
 
-  def my_fn(test_case: TestCase) -> str:
-    # Do work
+  def reverser_fn(test_case: TestCase) -> str:
+    # Simulate doing work
     time.sleep(random.random() * 3)
-
-    # Simulate random failures
-    if random.random() < 0.3:
-      return test_case.input
     
+    # Reverse the string
     return test_case.input[::-1]
 
   test_cases = []
   for _ in range(20):
-    uid = str(uuid.uuid4())
-    test_cases.append(TestCase(
-      input=uid,
-      expected_output=uid[::-1],
-    ))
+    input = str(uuid.uuid4())
+    test_cases.append(
+      TestCase(
+        input=input,
+        expected_output=input[::-1],
+        expected_substrings=input[::-1].split("-"),
+      ),
+    )
 
   test(
     id="reverser-bot-1",
     test_cases=test_cases,
     evaluators=[
-      Equality1(),
-      Equality2(),
+      Equality(),
+      HasSubstrings(),
     ],
-    fn=my_fn,
+    fn=reverser_fn,
   )
 
   test(
     id="reverser-bot-2",
     test_cases=test_cases,
     evaluators=[
-      Equality1(),
-      Equality2(),
+      Equality(),
+      HasSubstrings(),
     ],
-    fn=my_fn,
+    fn=reverser_fn,
   )
