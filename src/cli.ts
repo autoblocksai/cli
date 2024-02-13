@@ -28,9 +28,15 @@ yargs(hideBin(process.argv))
         })
         .option('interactive', {
           alias: 'i',
-          describe: 'Run command interactively',
+          describe: 'Run tests interactively',
           type: 'boolean',
           default: false,
+        })
+        .option('api-key', {
+          describe: 'Autoblocks API key',
+          type: 'string',
+          default: process.env.AUTOBLOCKS_API_KEY,
+          demandOption: true,
         })
         .help();
     },
@@ -49,6 +55,7 @@ yargs(hideBin(process.argv))
       handlers.testing.exec({
         command,
         commandArgs,
+        apiKey: argv['api-key'],
         runMessage: argv.message,
         port: argv.port,
         interactive: argv.interactive,

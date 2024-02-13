@@ -2,86 +2,11 @@ import { exec as execCommand } from '@actions/exec';
 import { serve } from '@hono/node-server';
 import type { ServerType } from '@hono/node-server/dist/types';
 import { zValidator } from '@hono/zod-validator';
-import crypto from 'crypto';
 import { Hono } from 'hono';
-import { z } from 'zod';
-import { startInteractiveCLI, interactiveEmitter } from './interactive-cli';
 import net from 'net';
+import { z } from 'zod';
+import { interactiveEmitter, startInteractiveCLI } from './interactive-cli';
 
-/**
- * Utils
- */
-function findAvailablePort(startPort: number): Promise<number> {
-  return new Promise((resolve, reject) => {
-    function tryListening(port: number) {
-      const server = net.createServer();
-
-      server.listen(port, () => {
-        server.once('close', () => {
-          resolve(port);
-        });
-        server.close();
-      });
-
-      server.on('error', (err) => {
-        if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
-          tryListening(port + 1);
-        } else {
-          reject(err);
-        }
-      });
-    }
-
-    tryListening(startPort);
-  });
-}
-
-/**
- * Globals
- */
-let _currentRunMessage: string | undefined = undefined;
-let _isInteractive: boolean | undefined = undefined;
-
-// Map of test's external ID to its current run ID and its internal test ID
-const testExternalIdToRun: Record<string, { runId: string; testId: string }> =
-  {};
-
-async function currentRun(args: {
-  testExternalId: string;
-}): Promise<{ runId: string; testId: string }> {
-  let run = testExternalIdToRun[args.testExternalId];
-  if (!run) {
-    run = await startRun({ testExternalId: args.testExternalId });
-    testExternalIdToRun[args.testExternalId] = run;
-  }
-  return run;
-}
-
-/**
- * Logger
- */
-const logger = {
-  log: (...args: unknown[]) => {
-    if (_isInteractive) {
-      interactiveEmitter.emit('logging.log', args);
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(...args);
-    }
-  },
-  warn: (...args: unknown[]) => {
-    if (_isInteractive) {
-      interactiveEmitter.emit('logging.warn', args);
-    } else {
-      // eslint-disable-next-line no-console
-      console.warn(...args);
-    }
-  },
-};
-
-/**
- * Accumulate events for the duration of the run
- */
 interface TestCaseEvent {
   testExternalId: string;
   testCaseHash: string;
@@ -91,207 +16,340 @@ interface TestCaseEvent {
   properties?: unknown;
 }
 
-const testCaseEvents: TestCaseEvent[] = [];
-
 /**
- * Keep a map of test case hashes to their result IDs
- *
- * testExternalId -> testCaseHash -> testCaseResultId
+ * Manages the state of the current run
  */
-const testCaseHashToResultId: Record<string, Record<string, string>> = {};
+class RunManager {
+  private readonly apiKey: string;
+  private readonly message: string | undefined;
+  readonly isInteractive: boolean;
 
-/**
- * Eval utils
- */
-function evaluationPassed(args: {
-  score: number;
-  thresholdOp: '<' | '<=' | '>' | '>=';
-  thresholdValue: number;
-}): boolean {
-  switch (args.thresholdOp) {
-    case '<':
-      return args.score < args.thresholdValue;
-    case '>':
-      return args.score > args.thresholdValue;
-    case '<=':
-      return args.score <= args.thresholdValue;
-    case '>=':
-      return args.score >= args.thresholdValue;
+  /**
+   * Keep a map of each test's external ID to its run ID
+   *
+   * (we create a run for each test)
+   */
+  private testExternalIdToRunId: Record<string, string>;
+
+  /**
+   * Keep a map of test case hashes to their result IDs
+   *
+   * testExternalId -> testCaseHash -> testCaseResultId
+   */
+  private testCaseHashToResultId: Record<string, Record<string, string>>;
+
+  /**
+   * Accumulate events for the duration of the run
+   */
+  private testCaseEvents: TestCaseEvent[];
+
+  constructor(args: {
+    apiKey: string;
+    runMessage: string | undefined;
+    isInteractive: boolean;
+  }) {
+    this.apiKey = args.apiKey;
+    this.message = args.runMessage;
+    this.isInteractive = args.isInteractive;
+
+    this.testExternalIdToRunId = {};
+    this.testCaseHashToResultId = {};
+    this.testCaseEvents = [];
   }
-}
 
-/**
- * Public API stubs
- */
-async function startRun(args: {
-  testExternalId: string;
-}): Promise<{ runId: string; testId: string }> {
-  logger.log('POST /api/testing/local/runs', {
-    testExternalId: args.testExternalId,
-    message: _currentRunMessage,
-  });
-  return { runId: crypto.randomUUID(), testId: crypto.randomUUID() };
-}
+  async findAvailablePort(args: { startPort: number }): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const tryListening = (port: number) => {
+        const server = net.createServer();
 
-async function endRun(args: { testExternalId: string }): Promise<void> {
-  const { runId } = await currentRun(args);
-  logger.log(`POST /api/testing/local/runs/${runId}/end`);
-  interactiveEmitter.emit('end', { testExternalId: args.testExternalId });
-  delete testExternalIdToRun[args.testExternalId];
-}
+        server.listen(port, () => {
+          server.once('close', () => {
+            if (port !== args.startPort) {
+              this.logger.log(`Listening on port ${port}`);
+            }
+            resolve(port);
+          });
+          server.close();
+        });
 
-async function postTestCaseResult(args: {
-  testExternalId: string;
-  testCaseHash: string;
-  testCaseBody?: unknown;
-  testCaseOutput?: unknown;
-  testCaseEvents: TestCaseEvent[];
-}): Promise<{ testCaseResultId: string }> {
-  const { runId, testId } = await currentRun(args);
-  logger.log(`POST /api/testing/local/runs/${runId}/results`, {
-    ...args,
-    testId,
-  });
-  return { testCaseResultId: crypto.randomUUID() };
-}
+        server.on('error', (err) => {
+          if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
+            this.logger.log(`Port ${port} is in use, trying port ${port + 1}`);
+            tryListening(port + 1);
+          } else {
+            reject(err);
+          }
+        });
+      };
 
-async function postTestCaseEval(args: {
-  testExternalId: string;
-  testCaseResultId: string;
-  evaluatorId: string;
-  score: number;
-  passed: boolean | undefined;
-  thresholdOp?: '<' | '<=' | '>' | '>=';
-  thresholdValue?: number;
-}): Promise<void> {
-  const { runId, testId } = await currentRun(args);
-  // TODO: use enums, zod schemas for passing this data to the interactive CLI
-  interactiveEmitter.emit('eval', args);
-  logger.log(`POST /api/testing/local/runs/${runId}/evals`, {
-    ...args,
-    testId,
-  });
+      tryListening(args.startPort);
+    });
+  }
+
+  private get logger() {
+    return {
+      debug: (...args: unknown[]) => {
+        if (this.isInteractive) {
+          interactiveEmitter.emit('logging.debug', args);
+        } else {
+          // eslint-disable-next-line no-console
+          console.debug(...args);
+        }
+      },
+      log: (...args: unknown[]) => {
+        if (this.isInteractive) {
+          interactiveEmitter.emit('logging.log', args);
+        } else {
+          // eslint-disable-next-line no-console
+          console.log(...args);
+        }
+      },
+      warn: (...args: unknown[]) => {
+        if (this.isInteractive) {
+          interactiveEmitter.emit('logging.warn', args);
+        } else {
+          // eslint-disable-next-line no-console
+          console.warn(...args);
+        }
+      },
+    };
+  }
+
+  private async post<T>(path: string, body?: unknown): Promise<T> {
+    this.logger.debug(`POST ${path}`, body);
+    const resp = await fetch(`https://api.autoblocks.ai${path}`, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+    });
+    if (!resp.ok) {
+      throw new Error(
+        `POST ${path} failed: ${resp.status} ${await resp.text()}`,
+      );
+    }
+    return resp.json();
+  }
+
+  private async startRun(args: { testExternalId: string }): Promise<string> {
+    const { id } = await this.post<{ id: string }>('/testing/local/runs', {
+      testExternalId: args.testExternalId,
+      message: this.message,
+    });
+    this.testExternalIdToRunId[args.testExternalId] = id;
+    return id;
+  }
+
+  private async currentRunId(args: {
+    testExternalId: string;
+  }): Promise<string> {
+    const runId = this.testExternalIdToRunId[args.testExternalId];
+    if (runId) {
+      return runId;
+    }
+    return this.startRun({ testExternalId: args.testExternalId });
+  }
+
+  handleTestCaseEvent(event: {
+    testExternalId: string;
+    testCaseHash: string;
+    message: string;
+    traceId: string;
+    timestamp: string;
+    properties?: unknown;
+  }) {
+    this.testCaseEvents.push(event);
+  }
+
+  async handleTestCaseResult(args: {
+    testExternalId: string;
+    testCaseHash: string;
+    testCaseBody?: unknown;
+    testCaseOutput?: unknown;
+  }) {
+    const events = this.testCaseEvents.filter(
+      (e) =>
+        e.testExternalId === args.testExternalId &&
+        e.testCaseHash === args.testCaseHash,
+    );
+    const runId = await this.currentRunId({
+      testExternalId: args.testExternalId,
+    });
+    const { id: resultId } = await this.post<{ id: string }>(
+      `/testing/local/runs/${runId}/results`,
+      {
+        testCaseHash: args.testCaseHash,
+        testCaseBody: args.testCaseBody,
+        testCaseOutput: args.testCaseOutput,
+        testCaseEvents: events,
+      },
+    );
+    if (!this.testCaseHashToResultId[args.testExternalId]) {
+      this.testCaseHashToResultId[args.testExternalId] = {};
+    }
+    this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
+      resultId;
+  }
+
+  private evaluationPassed(args: {
+    score: number;
+    thresholdOp: '<' | '<=' | '>' | '>=';
+    thresholdValue: number;
+  }): boolean {
+    switch (args.thresholdOp) {
+      case '<':
+        return args.score < args.thresholdValue;
+      case '>':
+        return args.score > args.thresholdValue;
+      case '<=':
+        return args.score <= args.thresholdValue;
+      case '>=':
+        return args.score >= args.thresholdValue;
+    }
+  }
+
+  async handleTestCaseEval(args: {
+    testExternalId: string;
+    testCaseHash: string;
+    evaluatorExternalId: string;
+    score: number;
+    thresholdOp?: '<' | '<=' | '>' | '>=';
+    thresholdValue?: number;
+  }): Promise<boolean | undefined> {
+    let passed: boolean | undefined = undefined;
+    if (args.thresholdOp && args.thresholdValue !== undefined) {
+      passed = this.evaluationPassed({
+        score: args.score,
+        thresholdOp: args.thresholdOp,
+        thresholdValue: args.thresholdValue,
+      });
+    }
+
+    const testCaseResultId =
+      this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
+
+    if (!testCaseResultId) {
+      this.logger.warn(
+        `No corresponding test case result ID for test case hash ${args.testCaseHash}`,
+      );
+      return;
+    }
+
+    const runId = await this.currentRunId({
+      testExternalId: args.testExternalId,
+    });
+
+    await this.post(
+      `/testing/local/runs/${runId}/results/${testCaseResultId}/evaluations`,
+      {
+        evaluatorExternalId: args.evaluatorExternalId,
+        score: args.score,
+        passed,
+        thresholdOp: args.thresholdOp,
+        thresholdValue: args.thresholdValue,
+      },
+    );
+
+    return passed;
+  }
+
+  async handleEndRun(args: { testExternalId: string }): Promise<void> {
+    const runId = this.testExternalIdToRunId[args.testExternalId];
+    if (!runId) {
+      this.logger.warn(
+        `Can't end run: no run ID found for test external ID ${args.testExternalId}`,
+      );
+      return;
+    }
+    interactiveEmitter.emit('end', { testExternalId: args.testExternalId });
+    await this.post(`/testing/local/runs/${runId}/end`);
+    delete this.testExternalIdToRunId[args.testExternalId];
+  }
 }
 
 /**
  * Server that receives requests from the SDKs
  */
-const app = new Hono();
+function createHonoApp(runManager: RunManager): Hono {
+  const app = new Hono();
 
-app.post(
-  '/events',
-  zValidator(
-    'json',
-    z.object({
-      testExternalId: z.string(),
-      testCaseHash: z.string(),
-      message: z.string(),
-      traceId: z.string(),
-      timestamp: z.string(),
-      properties: z.unknown(),
-    }),
-  ),
-  async (c) => {
-    const data = c.req.valid('json');
-    testCaseEvents.push(data);
-    return c.json('ok');
-  },
-);
+  app.post(
+    '/events',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+        testCaseHash: z.string(),
+        message: z.string(),
+        traceId: z.string(),
+        timestamp: z.string(),
+        properties: z.unknown(),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      runManager.handleTestCaseEvent(data);
+      return c.json('ok');
+    },
+  );
 
-app.post(
-  '/results',
-  zValidator(
-    'json',
-    z.object({
-      testExternalId: z.string(),
-      testCaseHash: z.string(),
-      testCaseBody: z.unknown(),
-      testCaseOutput: z.unknown(),
-    }),
-  ),
-  async (c) => {
-    const data = c.req.valid('json');
+  app.post(
+    '/results',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+        testCaseHash: z.string(),
+        testCaseBody: z.unknown(),
+        testCaseOutput: z.unknown(),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      await runManager.handleTestCaseResult(data);
+      return c.json('ok');
+    },
+  );
 
-    const events = testCaseEvents.filter(
-      (e) =>
-        e.testExternalId === data.testExternalId &&
-        e.testCaseHash === data.testCaseHash,
-    );
-    const { testCaseResultId } = await postTestCaseResult({
-      ...data,
-      testCaseEvents: events,
-    });
+  app.post(
+    '/evals',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+        testCaseHash: z.string(),
+        evaluatorExternalId: z.string(),
+        score: z.number(),
+        thresholdOp: z.enum(['<', '<=', '>', '>=']).optional(),
+        thresholdValue: z.number().optional(),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      const passed = await runManager.handleTestCaseEval(data);
+      return c.json({ passed });
+    },
+  );
 
-    if (!testCaseHashToResultId[data.testExternalId]) {
-      testCaseHashToResultId[data.testExternalId] = {};
-    }
+  app.post(
+    '/end',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      await runManager.handleEndRun(data);
+      return c.json('ok');
+    },
+  );
 
-    testCaseHashToResultId[data.testExternalId][data.testCaseHash] =
-      testCaseResultId;
-
-    return c.json('ok');
-  },
-);
-
-app.post(
-  '/evals',
-  zValidator(
-    'json',
-    z.object({
-      testExternalId: z.string(),
-      testCaseHash: z.string(),
-      evaluatorId: z.string(),
-      score: z.number(),
-      thresholdOp: z.enum(['<', '<=', '>', '>=']).optional(),
-      thresholdValue: z.number().optional(),
-    }),
-  ),
-  async (c) => {
-    const data = c.req.valid('json');
-
-    let passed: boolean | undefined = undefined;
-    if (data.thresholdOp && data.thresholdValue !== undefined) {
-      passed = evaluationPassed({
-        score: data.score,
-        thresholdOp: data.thresholdOp,
-        thresholdValue: data.thresholdValue,
-      });
-    }
-
-    const testCaseResultId =
-      testCaseHashToResultId[data.testExternalId]?.[data.testCaseHash];
-
-    if (!testCaseResultId) {
-      logger.warn(
-        `No corresponding test case result ID for test case hash ${data.testCaseHash}`,
-      );
-      return;
-    }
-
-    await postTestCaseEval({
-      ...data,
-      testCaseResultId,
-      passed,
-    });
-
-    return c.json({ passed });
-  },
-);
-
-app.post(
-  '/end',
-  zValidator(
-    'json',
-    z.object({
-      testExternalId: z.string(),
-    }),
-  ),
-  async (c) => {
-    const data = c.req.valid('json');
-    await endRun(data);
-    return c.json('ok');
-  },
-);
+  return app;
+}
 
 /**
  * Exec command while local server is running
@@ -299,24 +357,27 @@ app.post(
 export async function exec(args: {
   command: string;
   commandArgs: string[];
+  apiKey: string;
   runMessage: string | undefined;
   port: number;
   interactive: boolean;
 }) {
-  if (args.runMessage) {
-    _currentRunMessage = args.runMessage;
-  }
+  const runManager = new RunManager({
+    apiKey: args.apiKey,
+    runMessage: args.runMessage,
+    isInteractive: args.interactive,
+  });
 
-  if (args.interactive) {
-    _isInteractive = true;
+  if (runManager.isInteractive) {
     startInteractiveCLI();
   }
 
-  let server: ServerType | undefined = undefined;
+  let runningServer: ServerType | undefined = undefined;
 
-  const port = await findAvailablePort(args.port);
+  const port = await runManager.findAvailablePort({ startPort: args.port });
+  const app = createHonoApp(runManager);
 
-  server = serve(
+  runningServer = serve(
     {
       fetch: app.fetch,
       port,
@@ -335,7 +396,7 @@ export async function exec(args: {
         env,
         silent: args.interactive,
       }).finally(async () => {
-        server?.close();
+        runningServer?.close();
       });
     },
   );
