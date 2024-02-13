@@ -109,7 +109,7 @@ async def evaluate_output(
   await client.post("/evals", json=dict(
     testExternalId=id,
     testCaseHash=test_case.hash,
-    evaluatorId=evaluator.id,
+    evaluatorExternalId=evaluator.id,
     score=evaluation.score,
     thresholdOp=evaluation.threshold.op.value if evaluation.threshold else None,
     thresholdValue=evaluation.threshold.value if evaluation.threshold else None,
@@ -158,6 +158,8 @@ async def run_test(
   evaluators: List[BaseEvaluator],
   fn: Callable[[TestCase], Any],
 ):
+  await client.post("/start", json=dict(testExternalId=test_id))
+
   run_tasks = [
     asyncio.create_task(
       run_test_case(
@@ -239,7 +241,7 @@ if __name__ == "__main__":
 
   test(
     id="reverser-bot-2",
-    test_cases=[*test_cases, *test_cases],
+    test_cases=test_cases,
     evaluators=[
       Equality(),
     ],

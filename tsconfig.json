@@ -7,7 +7,6 @@
     "target": "ES2015",
     "jsx": "react",
     "strict": true,
-    "strictNullChecks": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true

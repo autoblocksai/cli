@@ -117,14 +117,17 @@ class RunManager {
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
     this.logger.debug(`POST ${path}`, body);
-    const resp = await fetch(`https://api.autoblocks.ai${path}`, {
-      method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
+    const resp = await fetch(
+      `https://public-api-nicolewhite.autoblocks.workers.dev${path}`,
+      {
+        method: 'POST',
+        body: body ? JSON.stringify(body) : undefined,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
       },
-    });
+    );
     if (!resp.ok) {
       throw new Error(
         `POST ${path} failed: ${resp.status} ${await resp.text()}`,
@@ -133,7 +136,7 @@ class RunManager {
     return resp.json();
   }
 
-  private async startRun(args: { testExternalId: string }): Promise<string> {
+  async handleStartRun(args: { testExternalId: string }): Promise<string> {
     const { id } = await this.post<{ id: string }>('/testing/local/runs', {
       testExternalId: args.testExternalId,
       message: this.message,
@@ -142,14 +145,21 @@ class RunManager {
     return id;
   }
 
-  private async currentRunId(args: {
-    testExternalId: string;
-  }): Promise<string> {
+  async handleEndRun(args: { testExternalId: string }): Promise<void> {
+    interactiveEmitter.emit('end', { testExternalId: args.testExternalId });
+    const runId = this.currentRunId({ testExternalId: args.testExternalId });
+    await this.post(`/testing/local/runs/${runId}/end`);
+    delete this.testExternalIdToRunId[args.testExternalId];
+  }
+
+  private currentRunId(args: { testExternalId: string }): string {
     const runId = this.testExternalIdToRunId[args.testExternalId];
-    if (runId) {
-      return runId;
+    if (!runId) {
+      throw new Error(
+        `No run ID found for test external ID ${args.testExternalId}`,
+      );
     }
-    return this.startRun({ testExternalId: args.testExternalId });
+    return runId;
   }
 
   handleTestCaseEvent(event: {
@@ -174,7 +184,7 @@ class RunManager {
         e.testExternalId === args.testExternalId &&
         e.testCaseHash === args.testCaseHash,
     );
-    const runId = await this.currentRunId({
+    const runId = this.currentRunId({
       testExternalId: args.testExternalId,
     });
     const { id: resultId } = await this.post<{ id: string }>(
@@ -227,6 +237,11 @@ class RunManager {
       });
     }
 
+    interactiveEmitter.emit('eval', {
+      ...args,
+      passed,
+    });
+
     const testCaseResultId =
       this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
 
@@ -237,7 +252,7 @@ class RunManager {
       return;
     }
 
-    const runId = await this.currentRunId({
+    const runId = this.currentRunId({
       testExternalId: args.testExternalId,
     });
 
@@ -254,19 +269,6 @@ class RunManager {
 
     return passed;
   }
-
-  async handleEndRun(args: { testExternalId: string }): Promise<void> {
-    const runId = this.testExternalIdToRunId[args.testExternalId];
-    if (!runId) {
-      this.logger.warn(
-        `Can't end run: no run ID found for test external ID ${args.testExternalId}`,
-      );
-      return;
-    }
-    interactiveEmitter.emit('end', { testExternalId: args.testExternalId });
-    await this.post(`/testing/local/runs/${runId}/end`);
-    delete this.testExternalIdToRunId[args.testExternalId];
-  }
 }
 
 /**
@@ -274,6 +276,36 @@ class RunManager {
  */
 function createHonoApp(runManager: RunManager): Hono {
   const app = new Hono();
+
+  app.post(
+    '/start',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      await runManager.handleStartRun(data);
+      return c.json('ok');
+    },
+  );
+
+  app.post(
+    '/end',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      await runManager.handleEndRun(data);
+      return c.json('ok');
+    },
+  );
 
   app.post(
     '/events',
@@ -330,21 +362,6 @@ function createHonoApp(runManager: RunManager): Hono {
       const data = c.req.valid('json');
       const passed = await runManager.handleTestCaseEval(data);
       return c.json({ passed });
-    },
-  );
-
-  app.post(
-    '/end',
-    zValidator(
-      'json',
-      z.object({
-        testExternalId: z.string(),
-      }),
-    ),
-    async (c) => {
-      const data = c.req.valid('json');
-      await runManager.handleEndRun(data);
-      return c.json('ok');
     },
   );
 
