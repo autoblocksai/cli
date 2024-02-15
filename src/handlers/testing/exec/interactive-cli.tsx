@@ -86,7 +86,7 @@ function TestRow(props: {
         <Box flexDirection="column">
           {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
             return (
-              <Box key={evaluatorExternalId}>
+              <Box key={evaluatorExternalId} overflowX="hidden">
                 {Array.from(uniqTestCaseHashes)
                   .slice(-100)
                   .map((testCaseHash) => {
