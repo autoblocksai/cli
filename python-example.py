@@ -227,148 +227,147 @@ def test(
 
 
 # Example usage
-if __name__ == "__main__":
-  with open("study_guide_outlines.json") as f:
-    outlines = json.load(f)
+with open("study_guide_outlines.json") as f:
+  outlines = json.load(f)
 
 
-  @dataclasses.dataclass(frozen=True)
-  class TestCase(BaseTestCase):
-    input: str
-    expected_substrings: List[str]
+@dataclasses.dataclass(frozen=True)
+class TestCase(BaseTestCase):
+  input: str
+  expected_substrings: List[str]
 
-    batch_idx: int
+  batch_idx: int
 
-    def hash(self) -> str:
-      return hashlib.md5(f"{self.input}{self.batch_idx}".encode()).hexdigest()
-    
-
-  def gen_test_cases() -> List[TestCase]:
-    test_cases = []
-    for batch_idx in range(20):
-      for outline in outlines:
-        test_cases.append(
-          TestCase(
-            input=outline["topic"],
-            expected_substrings=outline["topic"].split()[:2],
-            batch_idx=batch_idx,
-          ),
-        )
-    return test_cases
-
-
-  class HasSubstringsEvaluator(BaseEvaluator):
-    id = "has-substrings"
-
-    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      # Real score
-      score = 1 if all(sub in output for sub in test_case.expected_substrings) else 0
-
-      return Evaluation(
-        # Randomize for effect
-        score=random.choices([0, 1], weights=[0.1, 0.9])[0],
-        threshold=Threshold(
-          op=ThresholdOp.GTE,
-          value=1,
-        ),
-      )
-
-
-  class NumberOfBulletsEvaluator(BaseEvaluator):
-    id = "number-of-bullets"
-
-    # These could also exist on each test case if it's not a global constraint
-    min_bullets: int = 5
-    max_bullets: int = 20
-
-    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      num_bullets = len(output.splitlines())
-      # Real score
-      score = 1 if self.min_bullets <= num_bullets <= self.max_bullets else 0
-
-      # Or, if min_bullets and max_bullets are fields on each test case:
-      # score = 1 if test_case.min_bullets <= num_bullets <= test_case.max_bullets else 0
-
-      return Evaluation(
-        # Randomize for effect
-        score=random.choices([0, 1], weights=[0.1, 0.9])[0],
-        threshold=Threshold(
-          op=ThresholdOp.GTE,
-          value=1,
-        ),
-      )
-    
-
-  class CoherenceEvaluator(BaseEvaluator):
-    id = "coherence"
-
-    # Async evaluators are supported
-    async def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      # Simulate doing work
-      await asyncio.sleep(random.random() * 3)
-
-      return Evaluation(score=random.random())
+  def hash(self) -> str:
+    return hashlib.md5(f"{self.input}{self.batch_idx}".encode()).hexdigest()
   
 
-  class RelevanceEvaluator(BaseEvaluator):
-    id = "relevance"
-
-    # Synchronous evaluators are supported
-    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      # Simulate doing work
-      time.sleep(random.random() * 3)
-
-      return Evaluation(
-        score=random.random(),
-        threshold=Threshold(
-          op=ThresholdOp.GTE,
-          value=0.2,
+def gen_test_cases() -> List[TestCase]:
+  test_cases = []
+  for batch_idx in range(20):
+    for outline in outlines:
+      test_cases.append(
+        TestCase(
+          input=outline["topic"],
+          expected_substrings=outline["topic"].split()[:2],
+          batch_idx=batch_idx,
         ),
       )
+  return test_cases
 
 
-  # This function can be sync or async
-  def generate_study_guide_outline(test_case: TestCase) -> str:
+class HasSubstringsEvaluator(BaseEvaluator):
+  id = "has-substrings"
+
+  def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+    # Real score
+    score = 1 if all(sub in output for sub in test_case.expected_substrings) else 0
+
+    return Evaluation(
+      # Randomize for effect
+      score=random.choices([0, 1], weights=[0.1, 0.9])[0],
+      threshold=Threshold(
+        op=ThresholdOp.GTE,
+        value=1,
+      ),
+    )
+
+
+class NumberOfBulletsEvaluator(BaseEvaluator):
+  id = "number-of-bullets"
+
+  # These could also exist on each test case if it's not a global constraint
+  min_bullets: int = 5
+  max_bullets: int = 20
+
+  def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+    num_bullets = len(output.splitlines())
+    # Real score
+    score = 1 if self.min_bullets <= num_bullets <= self.max_bullets else 0
+
+    # Or, if min_bullets and max_bullets are fields on each test case:
+    # score = 1 if test_case.min_bullets <= num_bullets <= test_case.max_bullets else 0
+
+    return Evaluation(
+      # Randomize for effect
+      score=random.choices([0, 1], weights=[0.1, 0.9])[0],
+      threshold=Threshold(
+        op=ThresholdOp.GTE,
+        value=1,
+      ),
+    )
+  
+
+class CoherenceEvaluator(BaseEvaluator):
+  id = "coherence"
+
+  # Async evaluators are supported
+  async def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+    # Simulate doing work
+    await asyncio.sleep(random.random() * 3)
+
+    return Evaluation(score=random.random())
+
+
+class RelevanceEvaluator(BaseEvaluator):
+  id = "relevance"
+
+  # Synchronous evaluators are supported
+  def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
     # Simulate doing work
     time.sleep(random.random() * 3)
-    
-    # Get the mock outline from the json file
-    outline = [o["outline"] for o in outlines if o["topic"] == test_case.input][0]
 
-    # Remove some lines
-    num_lines_to_remove = random.randint(1, 3)
-    lines = outline.splitlines()
-    idx_to_remove = random.sample(range(len(lines)), num_lines_to_remove)
-    filtered_lines = [line for idx, line in enumerate(lines) if idx not in idx_to_remove]
+    return Evaluation(
+      score=random.random(),
+      threshold=Threshold(
+        op=ThresholdOp.GTE,
+        value=0.2,
+      ),
+    )
 
-    # Reorder some lines
-    num_lines_to_reorder = random.randint(1, 3)
-    idx_to_reorder = random.sample(range(len(filtered_lines)), num_lines_to_reorder)
-    reordered_lines = filtered_lines.copy()
-    for idx in idx_to_reorder:
-      reordered_lines[idx] = filtered_lines[idx_to_reorder[-1]]
-    
-    return "\n".join(reordered_lines)
 
+# This function can be sync or async
+def generate_study_guide_outline(test_case: TestCase) -> str:
+  # Simulate doing work
+  time.sleep(random.random() * 3)
   
-  # async def generate_study_guide_outline(test_case: TestCase) -> str:
-  #   # Simulate doing work
-  #   await asyncio.time.sleep(random.random() * 3)
-    
-  #   # Return the mock outline from the json file
-  #   return [o["outline"] for o in outlines if o["topic"] == test_case.topic][0]
+  # Get the mock outline from the json file
+  outline = [o["outline"] for o in outlines if o["topic"] == test_case.input][0]
+
+  # Remove some lines
+  num_lines_to_remove = random.randint(1, 3)
+  lines = outline.splitlines()
+  idx_to_remove = random.sample(range(len(lines)), num_lines_to_remove)
+  filtered_lines = [line for idx, line in enumerate(lines) if idx not in idx_to_remove]
+
+  # Reorder some lines
+  num_lines_to_reorder = random.randint(1, 3)
+  idx_to_reorder = random.sample(range(len(filtered_lines)), num_lines_to_reorder)
+  reordered_lines = filtered_lines.copy()
+  for idx in idx_to_reorder:
+    reordered_lines[idx] = filtered_lines[idx_to_reorder[-1]]
+  
+  return "\n".join(reordered_lines)
 
 
-  test(
-    id="study-guide-outlines-4",
-    test_cases=gen_test_cases(),
-    evaluators=[
-      HasSubstringsEvaluator(),
-      NumberOfBulletsEvaluator(),
-      CoherenceEvaluator(),
-      RelevanceEvaluator(),
-    ],
-    fn=generate_study_guide_outline,
-    max_test_case_concurrency=20,
-    max_evaluator_concurrency=2,
-  )
+# async def generate_study_guide_outline(test_case: TestCase) -> str:
+#   # Simulate doing work
+#   await asyncio.time.sleep(random.random() * 3)
+  
+#   # Return the mock outline from the json file
+#   return [o["outline"] for o in outlines if o["topic"] == test_case.topic][0]
+
+
+test(
+  id="study-guide-outlines-4",
+  test_cases=gen_test_cases(),
+  evaluators=[
+    HasSubstringsEvaluator(),
+    NumberOfBulletsEvaluator(),
+    CoherenceEvaluator(),
+    RelevanceEvaluator(),
+  ],
+  fn=generate_study_guide_outline,
+  max_test_case_concurrency=20,
+  max_evaluator_concurrency=2,
+)
