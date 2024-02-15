@@ -10,10 +10,25 @@ import { interactiveEmitter, startInteractiveCLI } from './interactive-cli';
 interface TestCaseEvent {
   testExternalId: string;
   testCaseHash: string;
-  message: string;
-  traceId: string;
-  timestamp: string;
-  properties?: unknown;
+  event: {
+    message: string;
+    traceId: string;
+    timestamp: string;
+    properties?: unknown;
+  };
+}
+
+interface TestCaseError {
+  testExternalId: string;
+  testCaseHash: string;
+  // Will be defined if the error occurred in an evalator's evaluate() function
+  // Otherwise, the error occurred somewhere in the function being tested
+  evaluatorExternalId?: string;
+  error: {
+    name: string;
+    message: string;
+    stacktrace: string;
+  };
 }
 
 /**
@@ -43,6 +58,11 @@ class RunManager {
    */
   private testCaseEvents: TestCaseEvent[];
 
+  /**
+   * Accumulate errors
+   */
+  testCaseErrors: TestCaseError[];
+
   constructor(args: {
     apiKey: string;
     runMessage: string | undefined;
@@ -55,6 +75,7 @@ class RunManager {
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
+    this.testCaseErrors = [];
   }
 
   async findAvailablePort(args: { startPort: number }): Promise<number> {
@@ -150,8 +171,9 @@ class RunManager {
   }
 
   async endAllRuns() {
-    await Promise.all(
-      Object.keys(this.testExternalIdToRunId).map((testExternalId) => {
+    const testIdsToEnd = Object.keys(this.testExternalIdToRunId);
+    await Promise.allSettled(
+      testIdsToEnd.map((testExternalId) => {
         return this.handleEndRun({ testExternalId });
       }),
     );
@@ -170,12 +192,27 @@ class RunManager {
   handleTestCaseEvent(event: {
     testExternalId: string;
     testCaseHash: string;
-    message: string;
-    traceId: string;
-    timestamp: string;
-    properties?: unknown;
+    event: {
+      message: string;
+      traceId: string;
+      timestamp: string;
+      properties?: unknown;
+    };
   }) {
     this.testCaseEvents.push(event);
+  }
+
+  handleTestCaseError(args: {
+    testExternalId: string;
+    testCaseHash: string;
+    evaluatorExternalId?: string;
+    error: {
+      name: string;
+      message: string;
+      stacktrace: string;
+    };
+  }) {
+    this.testCaseErrors.push(args);
   }
 
   async handleTestCaseResult(args: {
@@ -321,15 +358,39 @@ function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         testCaseHash: z.string(),
-        message: z.string(),
-        traceId: z.string(),
-        timestamp: z.string(),
-        properties: z.unknown(),
+        event: z.object({
+          message: z.string(),
+          traceId: z.string(),
+          timestamp: z.string(),
+          properties: z.unknown(),
+        }),
       }),
     ),
     async (c) => {
       const data = c.req.valid('json');
       runManager.handleTestCaseEvent(data);
+      return c.json('ok');
+    },
+  );
+
+  app.post(
+    '/errors',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+        testCaseHash: z.string(),
+        evaluatorExternalId: z.string().optional(),
+        error: z.object({
+          name: z.string(),
+          message: z.string(),
+          stacktrace: z.string(),
+        }),
+      }),
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      runManager.handleTestCaseError(data);
       return c.json('ok');
     },
   );
@@ -358,8 +419,8 @@ function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
-        evaluatorExternalId: z.string(),
         testCaseHash: z.string(),
+        evaluatorExternalId: z.string(),
         score: z.number(),
         thresholdOp: z.enum(['<', '<=', '>', '>=']).optional(),
         thresholdValue: z.number().optional(),
@@ -421,6 +482,10 @@ export async function exec(args: {
         silent: args.interactive,
       }).finally(async () => {
         await runManager.endAllRuns();
+        // Display errors to user
+        // for (const error of runManager.testCaseErrors) {
+        //   console.error(error);
+        // }
         runningServer?.close();
       });
     },

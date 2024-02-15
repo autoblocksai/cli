@@ -11,6 +11,7 @@ import inspect
 import asyncio
 import functools
 import threading
+import traceback
 import contextvars
 import dataclasses
 
@@ -61,7 +62,7 @@ class BaseEvaluator(abc.ABC):
   @abc.abstractmethod
   def evaluate(self, test_case: BaseTestCase, output: Any) -> Evaluation:
     pass
-  
+
 
 # Run utils
 client = httpx.AsyncClient(base_url=os.environ['AUTOBLOCKS_CLI_SERVER_ADDRESS'])
@@ -86,7 +87,28 @@ background_thread = threading.Thread(
 background_thread.start()
 
 
-async def gather_with_max_concurrency(max_concurrency: int, *coros: Coroutine):
+async def send_error(
+  test_id: str,
+  test_case_hash: str,
+  evaluator_id: Optional[str],
+  error: Exception,
+) -> None:
+  payload = dict(
+    testExternalId=test_id,
+    testCaseHash=test_case_hash,
+    error=dict(
+      name=type(error).__name__,
+      message=str(error),
+      stacktrace=traceback.format_exc(),
+    ),
+  )
+  if evaluator_id:
+    payload.update(evaluatorExternalId=evaluator_id)
+
+  await client.post("/errors", json=payload)
+
+
+async def gather_with_max_concurrency(max_concurrency: int, *coros: Coroutine) -> None:
     """
     Borrowed from https://stackoverflow.com/a/61478547
     """
@@ -95,7 +117,10 @@ async def gather_with_max_concurrency(max_concurrency: int, *coros: Coroutine):
     async def sem_coro(coro: Coroutine):
         async with semaphore:
             return await coro
-    return await asyncio.gather(*(sem_coro(c) for c in coros))
+
+    # return_exceptions=True causes exceptions to be returned as values instead
+    # of propagating them to the caller. this is similar in behavior to Promise.allSettled
+    await asyncio.gather(*(sem_coro(c) for c in coros), return_exceptions=True)
 
 
 async def evaluate_output(
@@ -104,17 +129,38 @@ async def evaluate_output(
   output: Any,
   evaluator: BaseEvaluator,
 ):
+  evaluation = None
+
   if inspect.iscoroutinefunction(evaluator.evaluate):
-    evaluation = await evaluator.evaluate(test_case, output)
+    try:
+      evaluation = await evaluator.evaluate(test_case, output)
+    except Exception as err:
+      await send_error(
+        test_id=test_id,
+        test_case_hash=test_case.cached_hash,
+        evaluator_id=evaluator.id,
+        error=err,
+      )
   else:
     ctx = contextvars.copy_context()
-    evaluation = await loop.run_in_executor(
-      None,
-      ctx.run,
-      evaluator.evaluate,
-      test_case,
-      output,
-    )
+    try:
+      evaluation = await loop.run_in_executor(
+        None,
+        ctx.run,
+        evaluator.evaluate,
+        test_case,
+        output,
+      )
+    except Exception as err:
+      await send_error(
+        test_id=test_id,
+        test_case_hash=test_case.cached_hash,
+        evaluator_id=evaluator.id,
+        error=err,
+      )
+
+  if evaluation is None:
+    return
 
   payload = dict(
     testExternalId=test_id,
@@ -140,11 +186,32 @@ async def run_test_case(
   current_test_id_var.set(test_id)
   current_test_case_var.set(test_case)
 
+  output = None
+
   if inspect.iscoroutinefunction(fn):
-    output = await fn(test_case)
+    try:
+      output = await fn(test_case)
+    except Exception as err:
+      await send_error(
+        test_id=test_id,
+        test_case_hash=test_case.cached_hash,
+        evaluator_id=None,
+        error=err,
+      )
   else:
     ctx = contextvars.copy_context()
-    output = await loop.run_in_executor(None, ctx.run, fn, test_case)
+    try:
+      output = await loop.run_in_executor(None, ctx.run, fn, test_case)
+    except Exception as err:
+      await send_error(
+        test_id=test_id,
+        test_case_hash=test_case.cached_hash,
+        evaluator_id=None,
+        error=err,
+      )
+
+  if output is None:
+    return
 
   test_case_body = dataclasses.asdict(test_case)
   test_case_body.pop("batch_idx", None)
