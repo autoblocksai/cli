@@ -15,16 +15,16 @@ yargs(hideBin(process.argv))
     'Execute a command that runs Autoblocks tests',
     (yargs) => {
       return yargs
+        .option('api-key', {
+          describe: 'Autoblocks API key',
+          type: 'string',
+          default: process.env.AUTOBLOCKS_API_KEY,
+          demandOption: true,
+        })
         .option('message', {
           alias: 'm',
           describe: 'Description for this run',
           type: 'string',
-        })
-        .option('port', {
-          alias: 'p',
-          describe: 'Local test server port number',
-          type: 'number',
-          default: 5555,
         })
         .option('interactive', {
           alias: 'i',
@@ -32,11 +32,16 @@ yargs(hideBin(process.argv))
           type: 'boolean',
           default: false,
         })
-        .option('api-key', {
-          describe: 'Autoblocks API key',
-          type: 'string',
-          default: process.env.AUTOBLOCKS_API_KEY,
-          demandOption: true,
+        .option('port', {
+          alias: 'p',
+          describe: 'Local test server port number',
+          type: 'number',
+          default: 5555,
+        })
+        .option('exit-1-on-evaluation-failure', {
+          describe: 'Exit with code 1 if any evaluation fails.',
+          type: 'boolean',
+          default: false,
         })
         .help();
     },
@@ -57,8 +62,9 @@ yargs(hideBin(process.argv))
         commandArgs,
         apiKey: argv['api-key'],
         runMessage: argv.message,
-        port: argv.port,
         interactive: argv.interactive,
+        port: argv.port,
+        exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
       });
     },
   )

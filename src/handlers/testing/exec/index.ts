@@ -59,9 +59,16 @@ class RunManager {
   private testCaseEvents: TestCaseEvent[];
 
   /**
-   * Accumulate errors
+   * Keep track of uncaught errors
    */
-  testCaseErrors: TestCaseError[];
+  uncaughtTestCaseErrors: TestCaseError[];
+
+  /**
+   * Keep track of whether or not there was ever an evaluation that did not pass
+   *
+   * This is used to determine the final exit code of the process
+   */
+  hasAnyFailedEvaluations: boolean;
 
   constructor(args: {
     apiKey: string;
@@ -75,7 +82,8 @@ class RunManager {
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
-    this.testCaseErrors = [];
+    this.uncaughtTestCaseErrors = [];
+    this.hasAnyFailedEvaluations = false;
   }
 
   async findAvailablePort(args: { startPort: number }): Promise<number> {
@@ -212,7 +220,7 @@ class RunManager {
       stacktrace: string;
     };
   }) {
-    this.testCaseErrors.push(args);
+    this.uncaughtTestCaseErrors.push(args);
   }
 
   async handleTestCaseResult(args: {
@@ -310,6 +318,10 @@ class RunManager {
         thresholdValue: args.thresholdValue,
       },
     );
+
+    if (passed === false) {
+      this.hasAnyFailedEvaluations = true;
+    }
 
     return passed;
   }
@@ -444,8 +456,9 @@ export async function exec(args: {
   commandArgs: string[];
   apiKey: string;
   runMessage: string | undefined;
-  port: number;
   interactive: boolean;
+  port: number;
+  exit1OnEvaluationFailure: boolean;
 }) {
   const runManager = new RunManager({
     apiKey: args.apiKey,
@@ -461,6 +474,29 @@ export async function exec(args: {
 
   const port = await runManager.findAvailablePort({ startPort: args.port });
   const app = createHonoApp(runManager);
+
+  let commandExitCode: number = 0;
+
+  async function cleanup() {
+    await runManager.endAllRuns();
+
+    runningServer?.close();
+
+    if (runManager.uncaughtTestCaseErrors.length > 0) {
+      // Display errors
+      for (const error of runManager.uncaughtTestCaseErrors) {
+        // eslint-disable-next-line no-console
+        console.error(error);
+      }
+      process.exit(1);
+    }
+
+    if (runManager.hasAnyFailedEvaluations && args.exit1OnEvaluationFailure) {
+      process.exit(1);
+    }
+
+    process.exit(commandExitCode);
+  }
 
   runningServer = serve(
     {
@@ -479,15 +515,23 @@ export async function exec(args: {
       // Execute the command
       execCommand(args.command, args.commandArgs, {
         env,
+        // will return error code as response (even if it's non-zero)
+        ignoreReturnCode: true,
         silent: args.interactive,
-      }).finally(async () => {
-        await runManager.endAllRuns();
-        // Display errors to user
-        // for (const error of runManager.testCaseErrors) {
-        //   console.error(error);
-        // }
-        runningServer?.close();
-      });
+      })
+        .then((exitCode) => {
+          commandExitCode = exitCode;
+        })
+        .catch(() => {
+          commandExitCode = 1;
+        })
+        .finally(async () => {
+          await cleanup();
+        });
     },
+  );
+
+  ['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) =>
+    process.on(signal, cleanup),
   );
 }
