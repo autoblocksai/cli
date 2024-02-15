@@ -117,17 +117,14 @@ class RunManager {
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
     this.logger.debug(`POST ${path}`, body);
-    const resp = await fetch(
-      `https://public-api-nicolewhite.autoblocks.workers.dev${path}`,
-      {
-        method: 'POST',
-        body: body ? JSON.stringify(body) : undefined,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+    const resp = await fetch(`https://api.autoblocks.ai${path}`, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
       },
-    );
+    });
     if (!resp.ok) {
       throw new Error(
         `POST ${path} failed: ${resp.status} ${await resp.text()}`,
