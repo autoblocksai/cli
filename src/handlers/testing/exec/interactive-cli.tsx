@@ -8,7 +8,7 @@ interface Evaluation {
   testExternalId: string;
   evaluatorExternalId: string;
   testCaseHash: string;
-  passed: boolean | undefined;
+  passed: boolean | null;
 }
 
 /**
@@ -25,6 +25,21 @@ function makeOrdereredSet(vals: string[]): Set<string> {
 export const interactiveEmitter = new EventEmitter();
 
 const Space = () => <Text> </Text>;
+
+function colorFromPassed(passed: boolean | null | undefined): string {
+  switch (passed) {
+    case true:
+      return 'green';
+    case false:
+      return 'red';
+    case null:
+      return 'yellow';
+    case undefined:
+      return 'gray';
+    default:
+      return 'gray';
+  }
+}
 
 function TestRow(props: {
   runIsOver: boolean;
@@ -58,13 +73,13 @@ function TestRow(props: {
           View
         </Link>
       </Box>
-      <Box alignItems="center" paddingLeft={2}>
-        <Box flexDirection="column" paddingRight={1}>
+      <Box paddingLeft={2} columnGap={2}>
+        <Box flexDirection="column">
           {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
             return (
-              <Text key={evaluatorExternalId} color="gray">
-                {evaluatorExternalId}
-              </Text>
+              <Box key={evaluatorExternalId} columnGap={1}>
+                <Text color="gray">{evaluatorExternalId}</Text>
+              </Box>
             );
           })}
         </Box>
@@ -72,23 +87,20 @@ function TestRow(props: {
           {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
             return (
               <Box key={evaluatorExternalId}>
-                {Array.from(uniqTestCaseHashes).map((testCaseHash) => {
-                  const passed = props.evals.find(
-                    (e) =>
-                      e.evaluatorExternalId === evaluatorExternalId &&
-                      e.testCaseHash === testCaseHash,
-                  )?.passed;
-                  return (
-                    <Text
-                      key={testCaseHash}
-                      color={
-                        passed == undefined ? 'gray' : passed ? 'green' : 'red'
-                      }
-                    >
-                      {'.'}
-                    </Text>
-                  );
-                })}
+                {Array.from(uniqTestCaseHashes)
+                  .slice(-100)
+                  .map((testCaseHash) => {
+                    const passed = props.evals.find(
+                      (e) =>
+                        e.evaluatorExternalId === evaluatorExternalId &&
+                        e.testCaseHash === testCaseHash,
+                    )?.passed;
+                    return (
+                      <Text key={testCaseHash} color={colorFromPassed(passed)}>
+                        {'.'}
+                      </Text>
+                    );
+                  })}
               </Box>
             );
           })}

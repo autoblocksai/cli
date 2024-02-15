@@ -3,7 +3,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 // The location of the built CLI entrypoint relative to this file's location
-const CLI_PATH = '../dist/cli.js';
+const CLI_PATH = '../dist/cli.mjs';
 
 function runCLI() {
   return spawn(

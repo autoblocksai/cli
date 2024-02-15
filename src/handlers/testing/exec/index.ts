@@ -239,7 +239,9 @@ class RunManager {
 
     interactiveEmitter.emit('eval', {
       ...args,
-      passed,
+      // The interactive CLI uses null to differentiate between
+      // "not run yet" and "has no pass / fail status"
+      passed: passed === undefined ? null : passed,
     });
 
     const testCaseResultId =

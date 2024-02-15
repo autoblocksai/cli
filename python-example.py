@@ -3,7 +3,9 @@ import abc
 import enum
 import uuid
 import time
+import json
 import httpx
+import random
 import hashlib
 import inspect
 import asyncio
@@ -20,10 +22,15 @@ from typing import Coroutine
 
 
 # Models
+@dataclasses.dataclass(frozen=True)
 class BaseTestCase(abc.ABC):
   @abc.abstractmethod
   def hash(self) -> str:
     pass
+
+  @functools.cached_property
+  def cached_hash(self) -> str:
+    return self.hash()
 
 
 class ThresholdOp(enum.Enum):
@@ -79,11 +86,11 @@ background_thread = threading.Thread(
 background_thread.start()
 
 
-async def gather_with_concurrency(n: int, *coros: List[Coroutine]):
+async def gather_with_max_concurrency(max_concurrency: int, *coros: Coroutine):
     """
     Borrowed from https://stackoverflow.com/a/61478547
     """
-    semaphore = asyncio.Semaphore(n)
+    semaphore = asyncio.Semaphore(max_concurrency)
 
     async def sem_coro(coro: Coroutine):
         async with semaphore:
@@ -92,8 +99,8 @@ async def gather_with_concurrency(n: int, *coros: List[Coroutine]):
 
 
 async def evaluate_output(
-  id: str,
-  test_case: str,
+  test_id: str,
+  test_case: BaseTestCase,
   output: Any,
   evaluator: BaseEvaluator,
 ):
@@ -109,14 +116,18 @@ async def evaluate_output(
       output,
     )
 
-  await client.post("/evals", json=dict(
-    testExternalId=id,
+  payload = dict(
+    testExternalId=test_id,
     evaluatorExternalId=evaluator.id,
-    testCaseHash=test_case.hash,
+    testCaseHash=test_case.cached_hash,
     score=evaluation.score,
-    thresholdOp=evaluation.threshold.op.value if evaluation.threshold else None,
-    thresholdValue=evaluation.threshold.value if evaluation.threshold else None,
-  ))
+  )
+  if evaluation.threshold:
+    payload.update(
+      thresholdOp=evaluation.threshold.op.value,
+      thresholdValue=evaluation.threshold.value,
+    )
+  await client.post("/evals", json=payload)
 
 
 async def run_test_case(
@@ -135,16 +146,19 @@ async def run_test_case(
     ctx = contextvars.copy_context()
     output = await loop.run_in_executor(None, ctx.run, fn, test_case)
 
+  test_case_body = dataclasses.asdict(test_case)
+  test_case_body.pop("batch_idx", None)
+
   await client.post("/results", json=dict(
     testExternalId=test_id,
-    testCaseHash=test_case.hash,
-    testCaseBody=dataclasses.asdict(test_case),
+    testCaseHash=test_case.cached_hash,
+    testCaseBody=test_case_body,
     testCaseOutput=output,
   ))
 
-  await gather_with_concurrency(max_evaluator_concurrency, *[
+  await gather_with_max_concurrency(max_evaluator_concurrency, *[
     evaluate_output(
-      id=test_id,
+      test_id=test_id,
       test_case=test_case,
       output=output,
       evaluator=evaluator,
@@ -162,7 +176,7 @@ async def run_test(
 ):
   await client.post("/start", json=dict(testExternalId=test_id))
 
-  await gather_with_concurrency(max_test_case_concurrency, *[
+  await gather_with_max_concurrency(max_test_case_concurrency, *[
     run_test_case(
       test_id=test_id,
       test_case=test_case,
@@ -205,118 +219,155 @@ def test(
 
 
 
+
+
+
+
+
+
+
 # Example usage
 if __name__ == "__main__":
-  import random
+  with open("study_guide_outlines.json") as f:
+    outlines = json.load(f)
 
 
   @dataclasses.dataclass(frozen=True)
   class TestCase(BaseTestCase):
     input: str
-    expected_output: str
     expected_substrings: List[str]
 
-    @functools.cached_property
+    batch_idx: int
+
     def hash(self) -> str:
-      return hashlib.md5(self.input.encode()).hexdigest()
-
-
-  class Equality(BaseEvaluator):
-    id = "equality"
-
-    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      # Simulate doing work
-      time.sleep(random.random() * 3)
-
-      # Simulate random failures
-      score = random.choice([0, 1])
-
-      return Evaluation(
-        score=score,
-        threshold=Threshold(
-          op=ThresholdOp.GTE,
-          value=1,
-        ),
-      )
-
-
-  class HasSubstrings(BaseEvaluator):
-    id = "has-substrings"
-
-    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      # Simulate doing work
-      time.sleep(random.random() * 3)
-
-      # Simulate random failures
-      score = random.choice([0, 1])
-
-      return Evaluation(
-        score=score,
-        threshold=Threshold(
-          op=ThresholdOp.GTE,
-          value=1,
-        ),
-      )
+      return hashlib.md5(f"{self.input}{self.batch_idx}".encode()).hexdigest()
     
-  class MinimumLength(BaseEvaluator):
-    id = "minimum-length"
 
-    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
-      # Simulate doing work
-      time.sleep(random.random() * 3)
-
-      # Simulate random failures
-      score = random.choice([0, 1])
-
-      return Evaluation(
-        score=score,
-        threshold=Threshold(
-          op=ThresholdOp.GTE,
-          value=1,
-        ),
-      )
-
-
-  def reverser_fn(test_case: TestCase) -> str:
-    # Simulate doing work
-    time.sleep(random.random() * 3)
-    
-    # Reverse the string
-    return test_case.input[::-1]
-
-
-  def gen_test_cases(num: int) -> List[TestCase]:
+  def gen_test_cases() -> List[TestCase]:
     test_cases = []
-    for _ in range(num):
-      input = str(uuid.uuid4())
-      test_cases.append(
-        TestCase(
-          input=input,
-          expected_output=input[::-1],
-          expected_substrings=input[::-1].split("-"),
-        ),
-      )
+    for batch_idx in range(20):
+      for outline in outlines:
+        test_cases.append(
+          TestCase(
+            input=outline["topic"],
+            expected_substrings=outline["topic"].split()[:2],
+            batch_idx=batch_idx,
+          ),
+        )
     return test_cases
 
 
-  test(
-    id="reverser-bot-1",
-    test_cases=gen_test_cases(12),
-    evaluators=[
-      Equality(),
-      HasSubstrings(),
-    ],
-    fn=reverser_fn,
-    max_test_case_concurrency=3,
-  )
+  class HasSubstringsEvaluator(BaseEvaluator):
+    id = "has-substrings"
+
+    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      # Real score
+      score = 1 if all(sub in output for sub in test_case.expected_substrings) else 0
+
+      return Evaluation(
+        # Randomize for effect
+        score=random.choices([0, 1], weights=[0.1, 0.9])[0],
+        threshold=Threshold(
+          op=ThresholdOp.GTE,
+          value=1,
+        ),
+      )
+
+
+  class NumberOfBulletsEvaluator(BaseEvaluator):
+    id = "number-of-bullets"
+
+    # These could also exist on each test case if it's not a global constraint
+    min_bullets: int = 5
+    max_bullets: int = 20
+
+    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      num_bullets = len(output.splitlines())
+      # Real score
+      score = 1 if self.min_bullets <= num_bullets <= self.max_bullets else 0
+
+      # Or, if min_bullets and max_bullets are fields on each test case:
+      # score = 1 if test_case.min_bullets <= num_bullets <= test_case.max_bullets else 0
+
+      return Evaluation(
+        # Randomize for effect
+        score=random.choices([0, 1], weights=[0.1, 0.9])[0],
+        threshold=Threshold(
+          op=ThresholdOp.GTE,
+          value=1,
+        ),
+      )
+    
+
+  class CoherenceEvaluator(BaseEvaluator):
+    id = "coherence"
+
+    # Async evaluators are supported
+    async def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      # Simulate doing work
+      await asyncio.sleep(random.random() * 3)
+
+      return Evaluation(score=random.random())
+  
+
+  class RelevanceEvaluator(BaseEvaluator):
+    id = "relevance"
+
+    # Synchronous evaluators are supported
+    def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
+      # Simulate doing work
+      time.sleep(random.random() * 3)
+
+      return Evaluation(
+        score=random.random(),
+        threshold=Threshold(
+          op=ThresholdOp.GTE,
+          value=0.2,
+        ),
+      )
+
+
+  # This function can be sync or async
+  def generate_study_guide_outline(test_case: TestCase) -> str:
+    # Simulate doing work
+    time.sleep(random.random() * 3)
+    
+    # Return the mock outline from the json file
+    outline = [o["outline"] for o in outlines if o["topic"] == test_case.input][0]
+
+    # Remove random lines based on batch_idx
+    num_lines_to_remove = test_case.batch_idx + 1
+    lines = outline.splitlines()
+    idx_to_remove = random.sample(range(len(lines)), num_lines_to_remove)
+    filtered_lines = [line for idx, line in enumerate(lines) if idx not in idx_to_remove]
+
+    # Reorder some lines
+    num_lines_to_reorder = test_case.batch_idx
+    idx_to_reorder = random.sample(range(len(filtered_lines)), num_lines_to_reorder)
+    reordered_lines = filtered_lines.copy()
+    for idx in idx_to_reorder:
+      reordered_lines[idx] = filtered_lines[idx_to_reorder[-1]]
+    
+    return "\n".join(reordered_lines)
+
+  
+  # async def generate_study_guide_outline(test_case: TestCase) -> str:
+  #   # Simulate doing work
+  #   await asyncio.time.sleep(random.random() * 3)
+    
+  #   # Return the mock outline from the json file
+  #   return [o["outline"] for o in outlines if o["topic"] == test_case.topic][0]
 
   test(
-    id="reverser-bot-2",
-    test_cases=gen_test_cases(29),
+    id="study-guide-outlines-4",
+    test_cases=gen_test_cases(),
     evaluators=[
-      Equality(),
-      MinimumLength(),
+      HasSubstringsEvaluator(),
+      NumberOfBulletsEvaluator(),
+      CoherenceEvaluator(),
+      RelevanceEvaluator(),
     ],
-    fn=reverser_fn,
-    max_test_case_concurrency=12,
+    fn=generate_study_guide_outline,
+    max_test_case_concurrency=20,
+    max_evaluator_concurrency=2,
   )
