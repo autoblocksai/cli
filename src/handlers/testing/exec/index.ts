@@ -152,6 +152,14 @@ class RunManager {
     delete this.testExternalIdToRunId[args.testExternalId];
   }
 
+  async endAllRuns() {
+    await Promise.all(
+      Object.keys(this.testExternalIdToRunId).map((testExternalId) => {
+        return this.handleEndRun({ testExternalId });
+      }),
+    );
+  }
+
   private currentRunId(args: { testExternalId: string }): string {
     const runId = this.testExternalIdToRunId[args.testExternalId];
     if (!runId) {
@@ -415,6 +423,7 @@ export async function exec(args: {
         env,
         silent: args.interactive,
       }).finally(async () => {
+        await runManager.endAllRuns();
         runningServer?.close();
       });
     },

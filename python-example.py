@@ -332,17 +332,17 @@ if __name__ == "__main__":
     # Simulate doing work
     time.sleep(random.random() * 3)
     
-    # Return the mock outline from the json file
+    # Get the mock outline from the json file
     outline = [o["outline"] for o in outlines if o["topic"] == test_case.input][0]
 
-    # Remove random lines based on batch_idx
-    num_lines_to_remove = test_case.batch_idx + 1
+    # Remove some lines
+    num_lines_to_remove = random.randint(1, 3)
     lines = outline.splitlines()
     idx_to_remove = random.sample(range(len(lines)), num_lines_to_remove)
     filtered_lines = [line for idx, line in enumerate(lines) if idx not in idx_to_remove]
 
     # Reorder some lines
-    num_lines_to_reorder = test_case.batch_idx
+    num_lines_to_reorder = random.randint(1, 3)
     idx_to_reorder = random.sample(range(len(filtered_lines)), num_lines_to_reorder)
     reordered_lines = filtered_lines.copy()
     for idx in idx_to_reorder:
@@ -357,6 +357,7 @@ if __name__ == "__main__":
     
   #   # Return the mock outline from the json file
   #   return [o["outline"] for o in outlines if o["topic"] == test_case.topic][0]
+
 
   test(
     id="study-guide-outlines-4",
