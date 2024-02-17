@@ -1,15 +1,10 @@
-import { EventEmitter } from 'events';
-import { Box, Text, render, useInput, Spacer } from 'ink';
+import { Box, Text, render, Spacer } from 'ink';
 import Spinner from 'ink-spinner';
 import React, { useEffect, useState } from 'react';
 import Link from 'ink-link';
+import { emitter, EventName, type EventSchemas } from './emitter';
 
-interface Evaluation {
-  testExternalId: string;
-  evaluatorExternalId: string;
-  testCaseHash: string;
-  passed: boolean | null;
-}
+type Evaluation = EventSchemas[EventName.EVALUATION];
 
 /**
  * Uses add() to ensure that the set is ordered by insertion order
@@ -21,8 +16,6 @@ function makeOrdereredSet(vals: string[]): Set<string> {
   vals.forEach((val) => set.add(val));
   return set;
 }
-
-export const interactiveEmitter = new EventEmitter();
 
 const Space = () => <Text> </Text>;
 
@@ -116,10 +109,6 @@ const App = () => {
     Record<string, boolean>
   >({});
 
-  useInput((input, key) => {
-    // TODO: add interaction!
-  });
-
   useEffect(() => {
     const evalListener = (e: Evaluation) => {
       setEvals((prevEvals) => {
@@ -133,12 +122,12 @@ const App = () => {
       });
     };
 
-    interactiveEmitter.on('eval', evalListener);
-    interactiveEmitter.on('end', onEndListener);
+    emitter.on(EventName.EVALUATION, evalListener);
+    emitter.on(EventName.RUN_ENDED, onEndListener);
 
     return () => {
-      interactiveEmitter.off('eval', evalListener);
-      interactiveEmitter.off('end', onEndListener);
+      emitter.off(EventName.EVALUATION, evalListener);
+      emitter.off(EventName.RUN_ENDED, onEndListener);
     };
   }, []);
 

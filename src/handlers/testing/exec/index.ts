@@ -5,7 +5,8 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono } from 'hono';
 import net from 'net';
 import { z } from 'zod';
-import { interactiveEmitter, startInteractiveCLI } from './interactive-cli';
+import { startInteractiveCLI } from './interactive-cli';
+import { EventName, emitter } from './emitter';
 
 interface TestCaseEvent {
   testExternalId: string;
@@ -119,7 +120,7 @@ class RunManager {
     return {
       debug: (...args: unknown[]) => {
         if (this.isInteractive) {
-          interactiveEmitter.emit('logging.debug', args);
+          // TODO: emit to interactive CLI
         } else {
           // eslint-disable-next-line no-console
           console.debug(...args);
@@ -127,7 +128,7 @@ class RunManager {
       },
       log: (...args: unknown[]) => {
         if (this.isInteractive) {
-          interactiveEmitter.emit('logging.log', args);
+          // TODO: emit to interactive CLI
         } else {
           // eslint-disable-next-line no-console
           console.log(...args);
@@ -135,7 +136,7 @@ class RunManager {
       },
       warn: (...args: unknown[]) => {
         if (this.isInteractive) {
-          interactiveEmitter.emit('logging.warn', args);
+          // TODO: emit to interactive CLI
         } else {
           // eslint-disable-next-line no-console
           console.warn(...args);
@@ -172,7 +173,7 @@ class RunManager {
   }
 
   async handleEndRun(args: { testExternalId: string }): Promise<void> {
-    interactiveEmitter.emit('end', { testExternalId: args.testExternalId });
+    emitter.emit(EventName.RUN_ENDED, { testExternalId: args.testExternalId });
     const runId = this.currentRunId({ testExternalId: args.testExternalId });
     await this.post(`/testing/local/runs/${runId}/end`);
     delete this.testExternalIdToRunId[args.testExternalId];
@@ -298,7 +299,7 @@ class RunManager {
       });
     }
 
-    interactiveEmitter.emit('eval', {
+    emitter.emit(EventName.EVALUATION, {
       ...args,
       // The interactive CLI uses null to differentiate between
       // "not run yet" and "has no pass / fail status"
