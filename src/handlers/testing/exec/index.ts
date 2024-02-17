@@ -18,11 +18,11 @@ interface TestCaseEvent {
   };
 }
 
-interface TestCaseError {
+interface UncaughtError {
   testExternalId: string;
-  testCaseHash: string;
-  // Will be defined if the error occurred in an evalator's evaluate() function
-  // Otherwise, the error occurred somewhere in the function being tested
+  // Will be defined if the error occurred within a certain test case
+  testCaseHash?: string;
+  // Will be defined if the error occurred within a certain evaluator
   evaluatorExternalId?: string;
   error: {
     name: string;
@@ -61,7 +61,7 @@ class RunManager {
   /**
    * Keep track of uncaught errors
    */
-  uncaughtTestCaseErrors: TestCaseError[];
+  uncaughtErrors: UncaughtError[];
 
   /**
    * Keep track of whether or not there was ever an evaluation that did not pass
@@ -82,7 +82,7 @@ class RunManager {
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
-    this.uncaughtTestCaseErrors = [];
+    this.uncaughtErrors = [];
     this.hasAnyFailedEvaluations = false;
   }
 
@@ -210,9 +210,9 @@ class RunManager {
     this.testCaseEvents.push(event);
   }
 
-  handleTestCaseError(args: {
+  handleUncaughtError(args: {
     testExternalId: string;
-    testCaseHash: string;
+    testCaseHash?: string;
     evaluatorExternalId?: string;
     error: {
       name: string;
@@ -220,7 +220,7 @@ class RunManager {
       stacktrace: string;
     };
   }) {
-    this.uncaughtTestCaseErrors.push(args);
+    this.uncaughtErrors.push(args);
   }
 
   async handleTestCaseResult(args: {
@@ -401,7 +401,10 @@ function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
-        testCaseHash: z.string(),
+        testCaseHash: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         evaluatorExternalId: z
           .string()
           .nullish()
@@ -415,7 +418,7 @@ function createHonoApp(runManager: RunManager): Hono {
     ),
     async (c) => {
       const data = c.req.valid('json');
-      runManager.handleTestCaseError(data);
+      runManager.handleUncaughtError(data);
       return c.json('ok');
     },
   );
@@ -514,9 +517,9 @@ export async function exec(args: {
 
     runningServer?.close();
 
-    if (runManager.uncaughtTestCaseErrors.length > 0) {
+    if (runManager.uncaughtErrors.length > 0) {
       // Display errors
-      for (const error of runManager.uncaughtTestCaseErrors) {
+      for (const error of runManager.uncaughtErrors) {
         // eslint-disable-next-line no-console
         console.error(error);
       }
