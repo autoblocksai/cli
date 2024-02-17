@@ -255,19 +255,27 @@ class RunManager {
 
   private evaluationPassed(args: {
     score: number;
-    thresholdOp: '<' | '<=' | '>' | '>=';
-    thresholdValue: number;
+    threshold: {
+      lt?: number;
+      lte?: number;
+      gt?: number;
+      gte?: number;
+    };
   }): boolean {
-    switch (args.thresholdOp) {
-      case '<':
-        return args.score < args.thresholdValue;
-      case '>':
-        return args.score > args.thresholdValue;
-      case '<=':
-        return args.score <= args.thresholdValue;
-      case '>=':
-        return args.score >= args.thresholdValue;
+    const results: boolean[] = [];
+    if (args.threshold.lt !== undefined) {
+      results.push(args.score < args.threshold.lt);
     }
+    if (args.threshold.lte !== undefined) {
+      results.push(args.score <= args.threshold.lte);
+    }
+    if (args.threshold.gt !== undefined) {
+      results.push(args.score > args.threshold.gt);
+    }
+    if (args.threshold.gte !== undefined) {
+      results.push(args.score >= args.threshold.gte);
+    }
+    return results.every((r) => r);
   }
 
   async handleTestCaseEval(args: {
@@ -275,15 +283,18 @@ class RunManager {
     testCaseHash: string;
     evaluatorExternalId: string;
     score: number;
-    thresholdOp?: '<' | '<=' | '>' | '>=';
-    thresholdValue?: number;
+    threshold?: {
+      lt?: number;
+      lte?: number;
+      gt?: number;
+      gte?: number;
+    };
   }): Promise<boolean | undefined> {
     let passed: boolean | undefined = undefined;
-    if (args.thresholdOp && args.thresholdValue !== undefined) {
+    if (args.threshold) {
       passed = this.evaluationPassed({
         score: args.score,
-        thresholdOp: args.thresholdOp,
-        thresholdValue: args.thresholdValue,
+        threshold: args.threshold,
       });
     }
 
@@ -314,8 +325,7 @@ class RunManager {
         evaluatorExternalId: args.evaluatorExternalId,
         score: args.score,
         passed,
-        thresholdOp: args.thresholdOp,
-        thresholdValue: args.thresholdValue,
+        threshold: args.threshold,
       },
     );
 
@@ -392,7 +402,10 @@ function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         testCaseHash: z.string(),
-        evaluatorExternalId: z.string().optional(),
+        evaluatorExternalId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         error: z.object({
           name: z.string(),
           message: z.string(),
@@ -434,8 +447,27 @@ function createHonoApp(runManager: RunManager): Hono {
         testCaseHash: z.string(),
         evaluatorExternalId: z.string(),
         score: z.number(),
-        thresholdOp: z.enum(['<', '<=', '>', '>=']).optional(),
-        thresholdValue: z.number().optional(),
+        threshold: z
+          .object({
+            lt: z
+              .number()
+              .nullish()
+              .transform((x) => x ?? undefined),
+            lte: z
+              .number()
+              .nullish()
+              .transform((x) => x ?? undefined),
+            gt: z
+              .number()
+              .nullish()
+              .transform((x) => x ?? undefined),
+            gte: z
+              .number()
+              .nullish()
+              .transform((x) => x ?? undefined),
+          })
+          .nullish()
+          .transform((x) => x ?? undefined),
       }),
     ),
     async (c) => {

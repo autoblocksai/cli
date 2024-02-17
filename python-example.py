@@ -34,17 +34,12 @@ class BaseTestCase(abc.ABC):
     return self.hash()
 
 
-class ThresholdOp(enum.Enum):
-  GT = '>'
-  GTE = '>='
-  LT = '<'
-  LTE = '<='
-
-
 @dataclasses.dataclass(frozen=True)
 class Threshold:
-  op: ThresholdOp
-  value: float
+  lt: Optional[float] = None
+  lte: Optional[float] = None
+  gt: Optional[float] = None
+  gte: Optional[float] = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -170,8 +165,7 @@ async def evaluate_output(
   )
   if evaluation.threshold:
     payload.update(
-      thresholdOp=evaluation.threshold.op.value,
-      thresholdValue=evaluation.threshold.value,
+      threshold=dataclasses.asdict(evaluation.threshold),
     )
   await client.post("/evals", json=payload)
 
@@ -334,8 +328,7 @@ class HasSubstringsEvaluator(BaseEvaluator):
       # Randomize for effect
       score=random.choices([0, 1], weights=[0.1, 0.9])[0],
       threshold=Threshold(
-        op=ThresholdOp.GTE,
-        value=1,
+        gte=1,
       ),
     )
 
@@ -359,8 +352,7 @@ class NumberOfBulletsEvaluator(BaseEvaluator):
       # Randomize for effect
       score=random.choices([0, 1], weights=[0.1, 0.9])[0],
       threshold=Threshold(
-        op=ThresholdOp.GTE,
-        value=1,
+        gte=1,
       ),
     )
   
@@ -387,8 +379,7 @@ class RelevanceEvaluator(BaseEvaluator):
     return Evaluation(
       score=random.random(),
       threshold=Threshold(
-        op=ThresholdOp.GTE,
-        value=0.2,
+        gte=0.2,
       ),
     )
 
@@ -426,7 +417,7 @@ def generate_study_guide_outline(test_case: TestCase) -> str:
 
 
 test(
-  id="study-guide-outlines-4",
+  id="study-guide-outlines",
   test_cases=gen_test_cases(),
   evaluators=[
     HasSubstringsEvaluator(),
