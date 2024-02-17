@@ -289,7 +289,7 @@ class RunManager {
       gt?: number;
       gte?: number;
     };
-  }): Promise<boolean | undefined> {
+  }): Promise<void> {
     let passed: boolean | undefined = undefined;
     if (args.threshold) {
       passed = this.evaluationPassed({
@@ -332,8 +332,6 @@ class RunManager {
     if (passed === false) {
       this.hasAnyFailedEvaluations = true;
     }
-
-    return passed;
   }
 }
 
@@ -475,8 +473,8 @@ function createHonoApp(runManager: RunManager): Hono {
     ),
     async (c) => {
       const data = c.req.valid('json');
-      const passed = await runManager.handleTestCaseEval(data);
-      return c.json({ passed });
+      await runManager.handleTestCaseEval(data);
+      return c.json('ok');
     },
   );
 
