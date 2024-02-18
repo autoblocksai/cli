@@ -2,11 +2,13 @@ import { exec as execCommand } from '@actions/exec';
 import { serve } from '@hono/node-server';
 import type { ServerType } from '@hono/node-server/dist/types';
 import { zValidator } from '@hono/zod-validator';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import net from 'net';
-import { z } from 'zod';
-import { startInteractiveCLI } from './interactive-cli';
-import { EventName, emitter } from './emitter';
+import { z, type SafeParseReturnType } from 'zod';
+import { renderTestProgress } from './components/progress';
+import { EventName, emitter, type EventSchemas } from './emitter';
+
+type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 
 interface TestCaseEvent {
   testExternalId: string;
@@ -19,17 +21,29 @@ interface TestCaseEvent {
   };
 }
 
-interface UncaughtError {
-  testExternalId: string;
-  // Will be defined if the error occurred within a certain test case
-  testCaseHash?: string;
-  // Will be defined if the error occurred within a certain evaluator
-  evaluatorExternalId?: string;
-  error: {
-    name: string;
-    message: string;
-    stacktrace: string;
-  };
+async function findAvailablePort(args: { startPort: number }): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const tryListening = (port: number) => {
+      const server = net.createServer();
+
+      server.listen(port, () => {
+        server.once('close', () => {
+          resolve(port);
+        });
+        server.close();
+      });
+
+      server.on('error', (err) => {
+        if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
+          tryListening(port + 1);
+        } else {
+          reject(err);
+        }
+      });
+    };
+
+    tryListening(args.startPort);
+  });
 }
 
 /**
@@ -38,7 +52,6 @@ interface UncaughtError {
 class RunManager {
   private readonly apiKey: string;
   private readonly message: string | undefined;
-  readonly isInteractive: boolean;
 
   /**
    * Keep a map of each test's external ID to its run ID
@@ -71,78 +84,15 @@ class RunManager {
    */
   hasAnyFailedEvaluations: boolean;
 
-  constructor(args: {
-    apiKey: string;
-    runMessage: string | undefined;
-    isInteractive: boolean;
-  }) {
+  constructor(args: { apiKey: string; runMessage: string | undefined }) {
     this.apiKey = args.apiKey;
     this.message = args.runMessage;
-    this.isInteractive = args.isInteractive;
 
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
     this.uncaughtErrors = [];
     this.hasAnyFailedEvaluations = false;
-  }
-
-  async findAvailablePort(args: { startPort: number }): Promise<number> {
-    return new Promise((resolve, reject) => {
-      const tryListening = (port: number) => {
-        const server = net.createServer();
-
-        server.listen(port, () => {
-          server.once('close', () => {
-            if (port !== args.startPort) {
-              this.logger.log(`Listening on port ${port}`);
-            }
-            resolve(port);
-          });
-          server.close();
-        });
-
-        server.on('error', (err) => {
-          if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
-            this.logger.log(`Port ${port} is in use, trying port ${port + 1}`);
-            tryListening(port + 1);
-          } else {
-            reject(err);
-          }
-        });
-      };
-
-      tryListening(args.startPort);
-    });
-  }
-
-  private get logger() {
-    return {
-      debug: (...args: unknown[]) => {
-        if (this.isInteractive) {
-          // TODO: emit to interactive CLI
-        } else {
-          // eslint-disable-next-line no-console
-          console.debug(...args);
-        }
-      },
-      log: (...args: unknown[]) => {
-        if (this.isInteractive) {
-          // TODO: emit to interactive CLI
-        } else {
-          // eslint-disable-next-line no-console
-          console.log(...args);
-        }
-      },
-      warn: (...args: unknown[]) => {
-        if (this.isInteractive) {
-          // TODO: emit to interactive CLI
-        } else {
-          // eslint-disable-next-line no-console
-          console.warn(...args);
-        }
-      },
-    };
   }
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
@@ -220,6 +170,12 @@ class RunManager {
       stacktrace: string;
     };
   }) {
+    emitter.emit(EventName.CONSOLE_LOG, {
+      ctx: 'cmd',
+      level: 'error',
+      message: JSON.stringify(args, null, 2),
+    });
+    emitter.emit(EventName.UNCAUGHT_ERROR, args);
     this.uncaughtErrors.push(args);
   }
 
@@ -300,7 +256,7 @@ class RunManager {
 
     emitter.emit(EventName.EVALUATION, {
       ...args,
-      // The interactive CLI uses null to differentiate between
+      // The test case progress component uses null to differentiate between
       // "not run yet" and "has no pass / fail status"
       passed: passed === undefined ? null : passed,
     });
@@ -309,10 +265,9 @@ class RunManager {
       this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
 
     if (!testCaseResultId) {
-      this.logger.warn(
+      throw new Error(
         `No corresponding test case result ID for test case hash ${args.testCaseHash}`,
       );
-      return;
     }
 
     const runId = this.currentRunId({
@@ -341,6 +296,29 @@ class RunManager {
 function createHonoApp(runManager: RunManager): Hono {
   const app = new Hono();
 
+  app.onError((err, c) => {
+    emitter.emit(EventName.CONSOLE_LOG, {
+      ctx: 'cli-server',
+      level: 'error',
+      message: `${c.req.method} ${c.req.path}: ${err.message}`,
+    });
+    return c.json('Internal Server Error', 500);
+  });
+
+  const handleValidationResult = (
+    result: SafeParseReturnType<unknown, unknown>,
+    c: Context,
+  ) => {
+    if (!result.success) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli-server',
+        level: 'error',
+        message: `${c.req.method} ${c.req.path}: ${result.error}`,
+      });
+      return c.json('Bad Request', 400);
+    }
+  };
+
   app.post(
     '/start',
     zValidator(
@@ -348,6 +326,7 @@ function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
       }),
+      handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -363,6 +342,7 @@ function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
       }),
+      handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -385,6 +365,7 @@ function createHonoApp(runManager: RunManager): Hono {
           properties: z.unknown(),
         }),
       }),
+      handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -413,6 +394,7 @@ function createHonoApp(runManager: RunManager): Hono {
           stacktrace: z.string(),
         }),
       }),
+      handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -431,6 +413,7 @@ function createHonoApp(runManager: RunManager): Hono {
         testCaseBody: z.unknown(),
         testCaseOutput: z.unknown(),
       }),
+      handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -470,6 +453,7 @@ function createHonoApp(runManager: RunManager): Hono {
           .nullish()
           .transform((x) => x ?? undefined),
       }),
+      handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
@@ -489,23 +473,23 @@ export async function exec(args: {
   commandArgs: string[];
   apiKey: string;
   runMessage: string | undefined;
-  interactive: boolean;
   port: number;
   exit1OnEvaluationFailure: boolean;
 }) {
+  renderTestProgress();
+
+  // Wait for listeners to be set up in the progress component
+  await new Promise((resolve) => {
+    setTimeout(resolve, 10);
+  });
+
   const runManager = new RunManager({
     apiKey: args.apiKey,
     runMessage: args.runMessage,
-    isInteractive: args.interactive,
   });
-
-  if (runManager.isInteractive) {
-    startInteractiveCLI();
-  }
 
   let runningServer: ServerType | undefined = undefined;
 
-  const port = await runManager.findAvailablePort({ startPort: args.port });
   const app = createHonoApp(runManager);
 
   let commandExitCode: number = 0;
@@ -516,11 +500,6 @@ export async function exec(args: {
     runningServer?.close();
 
     if (runManager.uncaughtErrors.length > 0) {
-      // Display errors
-      for (const error of runManager.uncaughtErrors) {
-        // eslint-disable-next-line no-console
-        console.error(error);
-      }
       process.exit(1);
     }
 
@@ -531,6 +510,7 @@ export async function exec(args: {
     process.exit(commandExitCode);
   }
 
+  const port = await findAvailablePort({ startPort: args.port });
   runningServer = serve(
     {
       fetch: app.fetch,
@@ -539,18 +519,46 @@ export async function exec(args: {
     (addressInfo) => {
       const serverAddress = `http://localhost:${addressInfo.port}`;
 
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli-server',
+        level: 'info',
+        message: `Listening on ${serverAddress}`,
+      });
+
       // Set environment variables for the SDKs to use
       const env = {
         ...process.env,
         AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
       };
 
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'info',
+        message: `Running command: ${args.command} ${args.commandArgs.join(' ')}`,
+      });
+
       // Execute the command
       execCommand(args.command, args.commandArgs, {
         env,
         // will return error code as response (even if it's non-zero)
         ignoreReturnCode: true,
-        silent: args.interactive,
+        silent: true,
+        listeners: {
+          stdline: (data: string) => {
+            emitter.emit(EventName.CONSOLE_LOG, {
+              ctx: 'cmd',
+              level: 'info',
+              message: data,
+            });
+          },
+          errline: (data: string) => {
+            emitter.emit(EventName.CONSOLE_LOG, {
+              ctx: 'cmd',
+              level: 'error',
+              message: data,
+            });
+          },
+        },
       })
         .then((exitCode) => {
           commandExitCode = exitCode;

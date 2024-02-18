@@ -1,13 +1,34 @@
-import { z } from 'zod';
 import { EventEmitter } from 'events';
+import { z } from 'zod';
 
 // Enum for event names
 export enum EventName {
+  CONSOLE_LOG = 'CONSOLE_LOG',
+  UNCAUGHT_ERROR = 'UNCAUGHT_ERROR',
   EVALUATION = 'EVALUATION',
   RUN_ENDED = 'RUN_ENDED',
 }
 
 // Zod schemas for event data
+const zConsoleLogSchema = z.object({
+  ctx: z.enum(['cmd', 'cli', 'cli-server']),
+  level: z.enum(['debug', 'info', 'warn', 'error']),
+  message: z.string(),
+});
+
+const zUncaughtErrorSchema = z.object({
+  testExternalId: z.string(),
+  // Will be defined if the error occurred within a certain test case
+  testCaseHash: z.string().optional(),
+  // Will be defined if the error occurred within a certain evaluator
+  evaluatorExternalId: z.string().optional(),
+  error: z.object({
+    name: z.string(),
+    message: z.string(),
+    stacktrace: z.string(),
+  }),
+});
+
 const zEvaluationSchema = z.object({
   testExternalId: z.string(),
   evaluatorExternalId: z.string(),
@@ -20,6 +41,8 @@ const zRunEndedSchema = z.object({
 });
 
 const eventSchemas = {
+  [EventName.CONSOLE_LOG]: zConsoleLogSchema,
+  [EventName.UNCAUGHT_ERROR]: zUncaughtErrorSchema,
   [EventName.EVALUATION]: zEvaluationSchema,
   [EventName.RUN_ENDED]: zRunEndedSchema,
 };

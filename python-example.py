@@ -307,6 +307,7 @@ def gen_test_cases() -> List[TestCase]:
   test_cases = []
   for batch_idx in range(1):
     for outline in outlines[:2]:
+      print("appending test case!!!")
       test_cases.append(
         TestCase(
           input=outline["topic"],
@@ -375,6 +376,9 @@ class RelevanceEvaluator(BaseEvaluator):
   def evaluate(self, test_case: TestCase, output: str) -> Evaluation:
     # Simulate doing work
     time.sleep(random.random() * 3)
+
+    if test_case.cached_hash == "c42a9da5475cf3e00b1824061d414eaa":
+      raise Exception("oops")
 
     return Evaluation(
       score=random.random(),

@@ -52,12 +52,6 @@ yargs(hideBin(process.argv))
           describe: 'Description for this run',
           type: 'string',
         })
-        .option('interactive', {
-          alias: 'i',
-          describe: 'Run tests interactively',
-          type: 'boolean',
-          default: false,
-        })
         .option('port', {
           alias: 'p',
           describe: 'Local test server port number',
@@ -93,7 +87,6 @@ npx autoblocks testing exec -- echo "Hello, world!
         commandArgs,
         apiKey: argv['api-key'],
         runMessage: argv.message,
-        interactive: argv.interactive,
         port: argv.port,
         exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
       });
