@@ -11,28 +11,4 @@ See:
 They suggest updating `tsconfig.json`'s `module` and `moduleResolution` fields to `node16`, but this breaks
 the types for other packages (like `hono`), so we patch the `ink*` packages instead.
 
-After running `npm install`, go to each `ink*` package in `node_modules/` and update their `package.json`:
-
-[`ink`](./node_modules/ink/package.json):
-
-```json
-{
-  "types": "build/"
-}
-```
-
-[`ink-link`](./node_modules/ink-link/package.json):
-
-```json
-{
-  "types": "dist/"
-}
-```
-
-[`ink-spinner`](./node_modules/ink-link/package.json):
-
-```json
-{
-  "types": "build/"
-}
-```
+After running `npm install`, run `bash ./tools/fixup-ink-types.sh` to fix the types.

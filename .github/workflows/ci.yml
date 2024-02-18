@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Fixup ink types
+        run: bash ./tools/fixup-ink-types.sh
+
       - name: Run type checks
         run: npm run type-check
 

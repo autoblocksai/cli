@@ -1,3 +1,4 @@
 .prettierignore
 *.py
 CODEOWNERS
+*.sh

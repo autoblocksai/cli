@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Fixup ink types
+        run: bash ./tools/fixup-ink-types.sh
+
       - name: Set version in package.json
         run: npm version ${{ inputs.version }} --no-git-tag-version
 
