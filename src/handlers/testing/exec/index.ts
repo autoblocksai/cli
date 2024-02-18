@@ -146,7 +146,6 @@ class RunManager {
   }
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
-    this.logger.debug(`POST ${path}`, body);
     const resp = await fetch(`https://api.autoblocks.ai${path}`, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,

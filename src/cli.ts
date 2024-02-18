@@ -2,12 +2,38 @@
 import process from 'process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import packageJson from '../package.json';
+import { renderOutdatedVersionComponent } from './components/outdated-version';
 import { handlers } from './handlers/index.js';
 
-const errorMessage = `No command found. Provide a command following '--'. For example:
+const packageName = packageJson.name;
+const packageVersion = packageJson.version;
 
-npx autoblocks testing exec -- echo "Hello, world!
-`;
+async function getLatestVersion(): Promise<string> {
+  const response = await fetch(
+    `https://registry.npmjs.org/${packageName}/latest`,
+  );
+  const data = await response.json();
+  return data.version;
+}
+
+async function latestVersionMiddleware(): Promise<void> {
+  try {
+    if (process.env.CI) {
+      return;
+    }
+
+    const latestVersion = await getLatestVersion();
+    if (latestVersion !== packageVersion) {
+      renderOutdatedVersionComponent({
+        currentVersion: packageVersion,
+        latestVersion,
+      });
+    }
+  } catch {
+    // Ignore
+  }
+}
 
 yargs(hideBin(process.argv))
   .command(
@@ -46,6 +72,11 @@ yargs(hideBin(process.argv))
         .help();
     },
     (argv) => {
+      const errorMessage = `No command found. Provide a command following '--'. For example:
+
+npx autoblocks testing exec -- echo "Hello, world!
+`;
+
       const unparsed = argv['--'];
       if (!Array.isArray(unparsed)) {
         throw new Error(errorMessage);
@@ -72,4 +103,5 @@ yargs(hideBin(process.argv))
   .parserConfiguration({
     'populate--': true,
   })
+  .middleware(latestVersionMiddleware)
   .parse();
