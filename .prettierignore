@@ -1,0 +1,4 @@
+.prettierignore
+*.py
+CODEOWNERS
+*.sh
