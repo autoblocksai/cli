@@ -49,3 +49,5 @@ jobs:
 
       - name: Run testing exec
         run: npx autoblocks testing exec -- echo "hi"
+        env:
+          AUTOBLOCKS_API_KEY: test
