@@ -476,12 +476,13 @@ export async function exec(args: {
   port: number;
   exit1OnEvaluationFailure: boolean;
 }) {
-  renderTestProgress();
+  let listenersCreated = false;
+  renderTestProgress({ onListenersCreated: () => (listenersCreated = true) });
 
-  // Wait for listeners to be set up in the progress component
-  await new Promise((resolve) => {
-    setTimeout(resolve, 10);
-  });
+  // Wait for listeners to be created before starting the server
+  while (!listenersCreated) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 
   const runManager = new RunManager({
     apiKey: args.apiKey,

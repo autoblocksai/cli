@@ -136,7 +136,7 @@ function TestRow(props: {
   );
 }
 
-const App = () => {
+const App = (props: { onListenersCreated: () => void }) => {
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
   const [evals, setEvals] = useState<Evaluation[]>([]);
@@ -173,6 +173,8 @@ const App = () => {
     emitter.on(EventName.UNCAUGHT_ERROR, uncaughtErrorListener);
     emitter.on(EventName.EVALUATION, evalListener);
     emitter.on(EventName.RUN_ENDED, runEndListener);
+
+    props.onListenersCreated();
 
     return () => {
       emitter.off(EventName.CONSOLE_LOG, consoleLogListener);
@@ -237,4 +239,5 @@ const App = () => {
   );
 };
 
-export const renderTestProgress = () => render(<App />);
+export const renderTestProgress = (args: { onListenersCreated: () => void }) =>
+  render(<App onListenersCreated={args.onListenersCreated} />);
