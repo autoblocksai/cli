@@ -46,3 +46,6 @@ jobs:
 
       - name: Run build
         run: npm run build
+
+      - name: Run testing exec
+        run: npx autoblocks testing exec -- echo "hi"
