@@ -35,7 +35,13 @@ async function findAvailablePort(args: { startPort: number }): Promise<number> {
 
       server.on('error', (err) => {
         if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
-          tryListening(port + 1);
+          const nextPort = port + 1;
+          emitter.emit(EventName.CONSOLE_LOG, {
+            ctx: 'cli-server',
+            level: 'info',
+            message: `Port ${port} is in use, trying port ${nextPort}...`,
+          });
+          tryListening(nextPort);
         } else {
           reject(err);
         }
@@ -113,6 +119,9 @@ class RunManager {
   }
 
   async handleStartRun(args: { testExternalId: string }): Promise<string> {
+    emitter.emit(EventName.RUN_STARTED, {
+      testExternalId: args.testExternalId,
+    });
     const { id } = await this.post<{ id: string }>('/testing/local/runs', {
       testExternalId: args.testExternalId,
       message: this.message,
@@ -318,6 +327,10 @@ function createHonoApp(runManager: RunManager): Hono {
       return c.json('Bad Request', 400);
     }
   };
+
+  app.get('/', (c) => {
+    return c.text('👋');
+  });
 
   app.post(
     '/start',

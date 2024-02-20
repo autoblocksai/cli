@@ -10,5 +10,4 @@ modify_package_json() {
 }
 
 modify_package_json "ink" "build/"
-modify_package_json "ink-link" "dist/"
 modify_package_json "ink-spinner" "build/"
