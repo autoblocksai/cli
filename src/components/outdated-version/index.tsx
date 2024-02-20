@@ -12,7 +12,6 @@ function OutdatedVersion(props: {
       borderStyle="round"
       alignItems="center"
       justifyContent="center"
-      width={100}
     >
       <Box>
         <Text>
