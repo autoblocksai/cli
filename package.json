@@ -5,6 +5,12 @@
   "bin": {
     "autoblocks": "bin/cli.js"
   },
+  "files": [
+    "bin",
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsup",
     "format": "prettier --write .",

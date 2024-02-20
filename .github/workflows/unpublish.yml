@@ -1,0 +1,29 @@
+name: Unpublish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to unpublish
+        required: true
+
+jobs:
+  unpublish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: https://registry.npmjs.org
+
+      - name: Unpublish @autoblocks/cli from npm
+        run: npm unpublish @autoblocks/cli@${{ inputs.version }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Unpublish autoblocks from npm
+        run: npm unpublish autoblocks@${{ inputs.version }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
