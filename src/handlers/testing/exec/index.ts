@@ -35,7 +35,13 @@ async function findAvailablePort(args: { startPort: number }): Promise<number> {
 
       server.on('error', (err) => {
         if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
-          tryListening(port + 1);
+          const nextPort = port + 1;
+          emitter.emit(EventName.CONSOLE_LOG, {
+            ctx: 'cli-server',
+            level: 'info',
+            message: `Port ${port} is in use, trying port ${nextPort}...`,
+          });
+          tryListening(nextPort);
         } else {
           reject(err);
         }
