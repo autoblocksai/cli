@@ -71,7 +71,7 @@ function TestRow(props: {
     props.evals.every((e) => e.passed !== false) && props.errors.length === 0;
   return (
     <Box flexDirection="column">
-      <Box>
+      <Box columnGap={1}>
         {props.runIsOver ? (
           <Text color={testDidPassOverall ? 'green' : 'red'}>
             {testDidPassOverall ? '✓' : '✗'}
@@ -225,6 +225,7 @@ const App = (props: { onListenersCreated: () => void }) => {
         borderStyle="round"
         borderColor="gray"
         minHeight={12}
+        rowGap={1}
       >
         {testExternalIds.length === 0 && (
           <Box>
