@@ -113,6 +113,9 @@ class RunManager {
   }
 
   async handleStartRun(args: { testExternalId: string }): Promise<string> {
+    emitter.emit(EventName.RUN_STARTED, {
+      testExternalId: args.testExternalId,
+    });
     const { id } = await this.post<{ id: string }>('/testing/local/runs', {
       testExternalId: args.testExternalId,
       message: this.message,
@@ -318,6 +321,10 @@ function createHonoApp(runManager: RunManager): Hono {
       return c.json('Bad Request', 400);
     }
   };
+
+  app.get('/', (c) => {
+    return c.text('👋');
+  });
 
   app.post(
     '/start',

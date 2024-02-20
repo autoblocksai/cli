@@ -1,5 +1,4 @@
 import { Box, Spacer, Static, Text, render } from 'ink';
-import Link from 'ink-link';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../emitter';
@@ -7,6 +6,7 @@ import { EventName, emitter, type EventSchemas } from '../../emitter';
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 type Evaluation = EventSchemas[EventName.EVALUATION];
+type RunStarted = EventSchemas[EventName.RUN_STARTED];
 type RunEnded = EventSchemas[EventName.RUN_ENDED];
 
 const MAX_TEST_CASES = 100;
@@ -82,11 +82,9 @@ function TestRow(props: {
         <Space />
         <Text bold={true}>{props.testExternalId}</Text>
         <Spacer />
-        <Link
-          url={`https://app.autoblocks.ai/testing/local/tests/${encodeURIComponent(props.testExternalId)}`}
-        >
-          View
-        </Link>
+        <Text>
+          {`https://app.autoblocks.ai/testing/local/tests/${encodeURIComponent(props.testExternalId)}`}
+        </Text>
       </Box>
       <Box paddingLeft={2} columnGap={2}>
         <Box flexDirection="column">
@@ -137,6 +135,7 @@ function TestRow(props: {
 }
 
 const App = (props: { onListenersCreated: () => void }) => {
+  const [testExternalIds, setTestExternalIds] = useState<string[]>([]);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
   const [evals, setEvals] = useState<Evaluation[]>([]);
@@ -163,6 +162,15 @@ const App = (props: { onListenersCreated: () => void }) => {
       });
     };
 
+    const runStartListener = (runStarted: RunStarted) => {
+      setTestExternalIds((prevIds) => {
+        return [
+          ...prevIds.filter((id) => id !== runStarted.testExternalId),
+          runStarted.testExternalId,
+        ];
+      });
+    };
+
     const runEndListener = (runEnded: RunEnded) => {
       setTestIdToRunIsOver((prevRunIsOver) => {
         return { ...prevRunIsOver, [runEnded.testExternalId]: true };
@@ -172,6 +180,7 @@ const App = (props: { onListenersCreated: () => void }) => {
     emitter.on(EventName.CONSOLE_LOG, consoleLogListener);
     emitter.on(EventName.UNCAUGHT_ERROR, uncaughtErrorListener);
     emitter.on(EventName.EVALUATION, evalListener);
+    emitter.on(EventName.RUN_STARTED, runStartListener);
     emitter.on(EventName.RUN_ENDED, runEndListener);
 
     props.onListenersCreated();
@@ -180,19 +189,16 @@ const App = (props: { onListenersCreated: () => void }) => {
       emitter.off(EventName.CONSOLE_LOG, consoleLogListener);
       emitter.off(EventName.UNCAUGHT_ERROR, uncaughtErrorListener);
       emitter.off(EventName.EVALUATION, evalListener);
+      emitter.off(EventName.RUN_STARTED, runStartListener);
       emitter.off(EventName.RUN_ENDED, runEndListener);
     };
   }, []);
-
-  const uniqTestExternalIds = makeOrdereredSet(
-    evals.map((e) => e.testExternalId),
-  );
 
   return (
     <>
       <Static items={consoleLogs}>
         {(log, idx) => (
-          <Box key={`${idx}`} flexDirection="column">
+          <Box key={idx}>
             <Text>
               <Text color="gray">
                 {'['}
@@ -211,13 +217,24 @@ const App = (props: { onListenersCreated: () => void }) => {
         )}
       </Static>
       <Box
+        // NOTE: This margin is required to prevent the logs being shown in the <Static> component
+        // above from clobbering this box
+        marginTop={1}
         paddingX={1}
         flexDirection="column"
         borderStyle="round"
         borderColor="gray"
         minHeight={12}
       >
-        {Array.from(uniqTestExternalIds).map((testExternalId) => {
+        {testExternalIds.length === 0 && (
+          <Box>
+            <Text color="gray">
+              Waiting for test results
+              <Spinner type="simpleDots" />
+            </Text>
+          </Box>
+        )}
+        {testExternalIds.map((testExternalId) => {
           const testEvals = evals.filter(
             (e) => e.testExternalId === testExternalId,
           );

@@ -6,6 +6,7 @@ export enum EventName {
   CONSOLE_LOG = 'CONSOLE_LOG',
   UNCAUGHT_ERROR = 'UNCAUGHT_ERROR',
   EVALUATION = 'EVALUATION',
+  RUN_STARTED = 'RUN_STARTED',
   RUN_ENDED = 'RUN_ENDED',
 }
 
@@ -36,6 +37,10 @@ const zEvaluationSchema = z.object({
   passed: z.boolean().nullable(),
 });
 
+const zRunStartedSchema = z.object({
+  testExternalId: z.string(),
+});
+
 const zRunEndedSchema = z.object({
   testExternalId: z.string(),
 });
@@ -44,6 +49,7 @@ const eventSchemas = {
   [EventName.CONSOLE_LOG]: zConsoleLogSchema,
   [EventName.UNCAUGHT_ERROR]: zUncaughtErrorSchema,
   [EventName.EVALUATION]: zEvaluationSchema,
+  [EventName.RUN_STARTED]: zRunStartedSchema,
   [EventName.RUN_ENDED]: zRunEndedSchema,
 };
 
