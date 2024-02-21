@@ -79,7 +79,6 @@ function TestRow(props: {
         ) : (
           <Spinner type="dots" />
         )}
-        <Space />
         <Text bold={true}>{props.testExternalId}</Text>
         <Spacer />
         <Text>
