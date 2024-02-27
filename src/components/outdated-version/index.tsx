@@ -25,7 +25,7 @@ function OutdatedVersion(props: {
         <Text>
           Run{' '}
           <Text color="cyan" bold={true}>
-            {'npx @autoblocks/cli@latest <command>'}
+            {'npx autoblocks@latest <command>'}
           </Text>{' '}
           to use the latest version
         </Text>
