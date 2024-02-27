@@ -42,14 +42,15 @@ yargs(hideBin(process.argv))
     (yargs) => {
       return yargs
         .option('api-key', {
-          describe: 'Autoblocks API key',
+          describe:
+            'Autoblocks API key. Can be set via the AUTOBLOCKS_API_KEY environment variable.',
           type: 'string',
           default: process.env.AUTOBLOCKS_API_KEY,
           demandOption: true,
         })
         .option('message', {
           alias: 'm',
-          describe: 'Description for this run',
+          describe: 'Description for this test run',
           type: 'string',
         })
         .option('port', {
@@ -93,8 +94,13 @@ npx autoblocks testing exec -- echo "Hello, world!
     },
   )
   // Populates `argv['--']` with the unparsed arguments after --
+  // https://github.com/yargs/yargs-parser?tab=readme-ov-file#populate---
   .parserConfiguration({
     'populate--': true,
   })
+  // Makes it so that the script name is "autoblocks" and not
+  // the name of the CLI entrypoint file (cli.mjs)
+  // https://yargs.js.org/docs/#api-reference-scriptname0
+  .scriptName('autoblocks')
   .middleware(latestVersionMiddleware)
   .parse();
