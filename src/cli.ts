@@ -1,14 +1,18 @@
 #!/bin/env node
-import process from 'process';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import packageJson from '../package.json';
 import { renderOutdatedVersionComponent } from './components/outdated-version';
 import { handlers } from './handlers/index.js';
+import { AutoblocksTracer } from '@autoblocks/client';
 
 const packageName = packageJson.name;
 const packageVersion = packageJson.version;
 
+/**
+ * Get the latest version of this package from the npm registry
+ * so we can show the user their CLI is out of date.
+ */
 async function getLatestVersion(): Promise<string> {
   const response = await fetch(
     `https://registry.npmjs.org/${packageName}/latest`,
@@ -35,7 +39,7 @@ async function latestVersionMiddleware(): Promise<void> {
   }
 }
 
-yargs(hideBin(process.argv))
+const parser = yargs(hideBin(process.argv))
   .command(
     'testing exec',
     'Execute a command that runs Autoblocks tests',
@@ -103,4 +107,55 @@ npx autoblocks testing exec -- echo "Hello, world!
   // https://yargs.js.org/docs/#api-reference-scriptname0
   .scriptName('autoblocks')
   .middleware(latestVersionMiddleware)
-  .parse();
+  // Don't allow unknown commands / options
+  .strict()
+  // We're handling errors ourselves below so that we can send them to Autoblocks
+  .fail(false);
+
+(async () => {
+  try {
+    // Parse and run the user's CLI command
+    await parser.parse();
+  } catch (err: unknown) {
+    if (!(err instanceof Error)) {
+      return;
+    }
+
+    // Log the CLI's help message followed by the error message
+    // TODO: render this with an ink component
+    // eslint-disable-next-line no-console
+    console.info(`${await parser.getHelp()}\n\n${err.message}`);
+
+    try {
+      // Initialize the tracer within the try-catch, since it's possible
+      // for tsup to have failed to bundle the ingestion key as a
+      // compile-time variable. This can happen if someone accidentally
+      // adds "import process from 'process'" to the top of this file,
+      // which ends up compiling to "import process2 from 'process'" and
+      // tsup only does replacement if it references `process` directly.
+      const tracer = new AutoblocksTracer({
+        ingestionKey: process.env.TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY,
+        // Use a small timeout, since sending the event blocks the process
+        // from exiting.
+        timeout: { seconds: 1 },
+      });
+
+      // Send error to Autoblocks
+      await tracer.sendEvent('cli.error', {
+        properties: {
+          version: packageVersion,
+          error: {
+            name: err.name,
+            // Don't include the full stacktrace, just the message.
+            // Full stacktraces can contains sensitive information.
+            message: err.message,
+          },
+        },
+      });
+    } catch {
+      // Ignore
+    }
+
+    process.exit(1);
+  }
+})();
