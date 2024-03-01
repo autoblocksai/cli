@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: ${{ secrets.TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -33,8 +35,6 @@ jobs:
 
       - name: Build package
         run: npm run build
-        env:
-          TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: ${{ secrets.TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY }}
 
       - name: Publish to npm
         run: npm publish --access public
