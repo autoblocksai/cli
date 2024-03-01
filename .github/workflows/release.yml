@@ -33,6 +33,8 @@ jobs:
 
       - name: Build package
         run: npm run build
+        env:
+          TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: ${{ secrets.TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY }}
 
       - name: Publish to npm
         run: npm publish --access public

@@ -13,6 +13,14 @@ const config = {
     // Console logging interferes with ink's output,
     // so logging should go through the dedicated logger.
     'no-console': 'error',
+    'no-restricted-imports': [
+      'error',
+      {
+        // Importing process directly prevents tsup
+        // from bundling compile-time variables.
+        paths: ['process'],
+      },
+    ],
   },
   ignorePatterns: ['dist/**'],
 };
