@@ -117,14 +117,21 @@ npx autoblocks testing exec -- echo "Hello, world!
     // Parse and run the user's CLI command
     await parser.parse();
   } catch (err: unknown) {
-    if (!(err instanceof Error)) {
-      return;
-    }
+    const { errorName, errorMessage } =
+      err instanceof Error
+        ? {
+            errorName: err.name,
+            errorMessage: err.message,
+          }
+        : {
+            errorName: 'UnknownError',
+            errorMessage: `${err}`,
+          };
 
     // Log the CLI's help message followed by the error message
     // TODO: render this with an ink component
     // eslint-disable-next-line no-console
-    console.info(`${await parser.getHelp()}\n\n${err.message}`);
+    console.info(`${await parser.getHelp()}\n\n${errorMessage}`);
 
     try {
       // Initialize the tracer within the try-catch, since it's possible
@@ -145,10 +152,10 @@ npx autoblocks testing exec -- echo "Hello, world!
         properties: {
           version: packageVersion,
           error: {
-            name: err.name,
+            name: errorName,
             // Don't include the full stacktrace, just the message.
             // Full stacktraces can contains sensitive information.
-            message: err.message,
+            message: errorMessage,
           },
         },
       });
