@@ -254,6 +254,7 @@ class RunManager {
       gt?: number;
       gte?: number;
     };
+    metadata?: unknown;
   }): Promise<void> {
     let passed: boolean | undefined = undefined;
     if (args.threshold) {
@@ -290,6 +291,7 @@ class RunManager {
         score: args.score,
         passed,
         threshold: args.threshold,
+        metadata: args.metadata,
       },
     );
 
@@ -463,6 +465,10 @@ function createHonoApp(runManager: RunManager): Hono {
               .nullish()
               .transform((x) => x ?? undefined),
           })
+          .nullish()
+          .transform((x) => x ?? undefined),
+        metadata: z
+          .unknown()
           .nullish()
           .transform((x) => x ?? undefined),
       }),
