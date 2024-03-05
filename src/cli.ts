@@ -39,6 +39,15 @@ async function latestVersionMiddleware(): Promise<void> {
   }
 }
 
+// The newline at the top of this message is intentional;
+// it gives separation between the error message shown by
+// yargs and this one.
+const apiKeyMissingErrorMessage = `
+Autoblocks API key is required.
+Provide it via the AUTOBLOCKS_API_KEY environment variable or the --api-key option.
+
+You can get your API key from https://app.autoblocks.ai/settings/api-keys`;
+
 const parser = yargs(hideBin(process.argv))
   .command(
     'testing exec',
@@ -50,7 +59,6 @@ const parser = yargs(hideBin(process.argv))
             'Autoblocks API key. Can be set via the AUTOBLOCKS_API_KEY environment variable.',
           type: 'string',
           default: process.env.AUTOBLOCKS_API_KEY,
-          demandOption: true,
         })
         .option('message', {
           alias: 'm',
@@ -68,6 +76,7 @@ const parser = yargs(hideBin(process.argv))
           type: 'boolean',
           default: false,
         })
+        .demandOption('api-key', apiKeyMissingErrorMessage)
         .help();
     },
     (argv) => {
