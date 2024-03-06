@@ -3,10 +3,12 @@ import { serve } from '@hono/node-server';
 import type { ServerType } from '@hono/node-server/dist/types';
 import { zValidator } from '@hono/zod-validator';
 import { Hono, type Context } from 'hono';
-import net from 'net';
+
 import { z, type SafeParseReturnType } from 'zod';
 import { renderTestProgress } from './components/progress';
 import { EventName, emitter, type EventSchemas } from './emitter';
+import { makeCIContext, type CIContext } from './util/ci';
+import { findAvailablePort } from './util/net';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 
@@ -19,37 +21,6 @@ interface TestCaseEvent {
     timestamp: string;
     properties?: unknown;
   };
-}
-
-async function findAvailablePort(args: { startPort: number }): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const tryListening = (port: number) => {
-      const server = net.createServer();
-
-      server.listen(port, () => {
-        server.once('close', () => {
-          resolve(port);
-        });
-        server.close();
-      });
-
-      server.on('error', (err) => {
-        if ((err as { code?: string } | undefined)?.code === 'EADDRINUSE') {
-          const nextPort = port + 1;
-          emitter.emit(EventName.CONSOLE_LOG, {
-            ctx: 'cli-server',
-            level: 'info',
-            message: `Port ${port} is in use, trying port ${nextPort}...`,
-          });
-          tryListening(nextPort);
-        } else {
-          reject(err);
-        }
-      });
-    };
-
-    tryListening(args.startPort);
-  });
 }
 
 /**
@@ -90,6 +61,18 @@ class RunManager {
    */
   hasAnyFailedEvaluations: boolean;
 
+  /**
+   * The CI context, parsed from environment variables and local git data.
+   */
+  private ciContext: CIContext | undefined;
+
+  /**
+   * Only relevant for CI runs. This is returned from our REST API
+   * when we POST to /builds at the beginning of a build on CI.
+   * It's used in subsequent requests to associate runs with the build.
+   */
+  private ciBuildId: string | undefined;
+
   constructor(args: { apiKey: string; runMessage: string | undefined }) {
     this.apiKey = args.apiKey;
     this.message = args.runMessage;
@@ -102,7 +85,8 @@ class RunManager {
   }
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
-    const resp = await fetch(`https://api.autoblocks.ai${path}`, {
+    const subpath = this.isCI ? '/testing/ci' : '/testing/local';
+    const resp = await fetch(`https://api.autoblocks.ai${subpath}${path}`, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
       headers: {
@@ -118,13 +102,75 @@ class RunManager {
     return resp.json();
   }
 
+  private get isCI(): boolean {
+    return process.env.CI === 'true';
+  }
+
+  async makeCIContext(): Promise<CIContext | undefined> {
+    if (!this.isCI) {
+      return undefined;
+    }
+    if (!this.ciContext) {
+      try {
+        this.ciContext = await makeCIContext();
+      } catch (err) {
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'error',
+          message: `Failed to get CI context: ${err}`,
+        });
+        throw err;
+      }
+    }
+    return this.ciContext;
+  }
+
+  async setup(): Promise<void> {
+    const ciContext = await this.makeCIContext();
+
+    if (!ciContext) {
+      return;
+    }
+
+    emitter.emit(EventName.CONSOLE_LOG, {
+      ctx: 'cli',
+      level: 'debug',
+      message: `Running in CI environment: ${JSON.stringify(ciContext, null, 2)}`,
+    });
+
+    const { id } = await this.post<{ id: string }>('/builds', {
+      gitProvider: ciContext.gitProvider,
+      repositoryExternalId: ciContext.repoId,
+      repositoryName: ciContext.repoName,
+      repositoryHtmlUrl: ciContext.repoHtmlUrl,
+      // TODO: figure out how to get internal branch ID from github
+      branchExternalId: ciContext.branchName,
+      branchName: ciContext.branchName,
+      isDefaultBranch: ciContext.branchName === ciContext.defaultBranchName,
+      ciProvider: ciContext.ciProvider,
+      buildHtmlUrl: ciContext.buildHtmlUrl,
+      commitSha: ciContext.commitSha,
+      commitMessage: ciContext.commitMessage,
+      commitComitterName: ciContext.commitCommitterName,
+      commitCommitterEmail: ciContext.commitCommitterEmail,
+      commitAuthorName: ciContext.commitAuthorName,
+      commitAuthorEmail: ciContext.commitAuthorEmail,
+      commitCommittedDate: ciContext.commitCommittedDate,
+      pullRequestNumber: ciContext.pullRequestNumber,
+      pullRequestTitle: ciContext.pullRequestTitle,
+    });
+
+    this.ciBuildId = id;
+  }
+
   async handleStartRun(args: { testExternalId: string }): Promise<string> {
     emitter.emit(EventName.RUN_STARTED, {
       testExternalId: args.testExternalId,
     });
-    const { id } = await this.post<{ id: string }>('/testing/local/runs', {
+    const { id } = await this.post<{ id: string }>('/runs', {
       testExternalId: args.testExternalId,
       message: this.message,
+      buildId: this.ciBuildId,
     });
     this.testExternalIdToRunId[args.testExternalId] = id;
     return id;
@@ -132,9 +178,13 @@ class RunManager {
 
   async handleEndRun(args: { testExternalId: string }): Promise<void> {
     emitter.emit(EventName.RUN_ENDED, { testExternalId: args.testExternalId });
-    const runId = this.currentRunId({ testExternalId: args.testExternalId });
-    await this.post(`/testing/local/runs/${runId}/end`);
-    delete this.testExternalIdToRunId[args.testExternalId];
+
+    try {
+      const runId = this.currentRunId({ testExternalId: args.testExternalId });
+      await this.post(`/runs/${runId}/end`);
+    } finally {
+      delete this.testExternalIdToRunId[args.testExternalId];
+    }
   }
 
   async endAllRuns() {
@@ -203,7 +253,7 @@ class RunManager {
       testExternalId: args.testExternalId,
     });
     const { id: resultId } = await this.post<{ id: string }>(
-      `/testing/local/runs/${runId}/results`,
+      `/runs/${runId}/results`,
       {
         testCaseHash: args.testCaseHash,
         testCaseBody: args.testCaseBody,
@@ -284,16 +334,13 @@ class RunManager {
       testExternalId: args.testExternalId,
     });
 
-    await this.post(
-      `/testing/local/runs/${runId}/results/${testCaseResultId}/evaluations`,
-      {
-        evaluatorExternalId: args.evaluatorExternalId,
-        score: args.score,
-        passed,
-        threshold: args.threshold,
-        metadata: args.metadata,
-      },
-    );
+    await this.post(`/runs/${runId}/results/${testCaseResultId}/evaluations`, {
+      evaluatorExternalId: args.evaluatorExternalId,
+      score: args.score,
+      passed,
+      threshold: args.threshold,
+      metadata: args.metadata,
+    });
 
     if (passed === false) {
       this.hasAnyFailedEvaluations = true;
@@ -309,7 +356,7 @@ function createHonoApp(runManager: RunManager): Hono {
 
   app.onError((err, c) => {
     emitter.emit(EventName.CONSOLE_LOG, {
-      ctx: 'cli-server',
+      ctx: 'cli',
       level: 'error',
       message: `${c.req.method} ${c.req.path}: ${err.message}`,
     });
@@ -322,7 +369,7 @@ function createHonoApp(runManager: RunManager): Hono {
   ) => {
     if (!result.success) {
       emitter.emit(EventName.CONSOLE_LOG, {
-        ctx: 'cli-server',
+        ctx: 'cli',
         level: 'error',
         message: `${c.req.method} ${c.req.path}: ${result.error}`,
       });
@@ -508,6 +555,8 @@ export async function exec(args: {
     runMessage: args.runMessage,
   });
 
+  await runManager.setup();
+
   let runningServer: ServerType | undefined = undefined;
 
   const app = createHonoApp(runManager);
@@ -540,16 +589,10 @@ export async function exec(args: {
       const serverAddress = `http://localhost:${addressInfo.port}`;
 
       emitter.emit(EventName.CONSOLE_LOG, {
-        ctx: 'cli-server',
+        ctx: 'cli',
         level: 'info',
         message: `Listening on ${serverAddress}`,
       });
-
-      // Set environment variables for the SDKs to use
-      const env = {
-        ...process.env,
-        AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
-      };
 
       emitter.emit(EventName.CONSOLE_LOG, {
         ctx: 'cli',
@@ -559,7 +602,11 @@ export async function exec(args: {
 
       // Execute the command
       execCommand(args.command, args.commandArgs, {
-        env,
+        // Set environment variables for the SDKs to use
+        env: {
+          ...process.env,
+          AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
+        },
         // will return error code as response (even if it's non-zero)
         ignoreReturnCode: true,
         silent: true,

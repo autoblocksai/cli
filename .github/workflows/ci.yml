@@ -8,6 +8,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
+  TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -46,10 +50,6 @@ jobs:
 
       - name: Run build
         run: npm run build
-        env:
-          TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
 
       - name: Run testing exec
         run: npx autoblocks testing exec -- echo "hi"
-        env:
-          AUTOBLOCKS_API_KEY: test

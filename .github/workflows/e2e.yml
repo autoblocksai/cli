@@ -1,0 +1,80 @@
+name: E2E
+
+on:
+  # Run on different types of events to ensure we are
+  # handling the git data correctly in each scenario
+  push:
+  pull_request:
+  schedule:
+    - cron: '17 15 * * *'
+
+env:
+  AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
+  TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
+
+jobs:
+  py:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # For debugging purposes
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CLI dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Install dependencies in e2e/python
+        run: pip install -r requirements.txt
+        working-directory: e2e/python
+
+      - name: Run tests in e2e/python
+        run: ../../bin/cli.js testing exec -- python3 run.py
+        working-directory: e2e/python
+        env:
+          PYTHONPATH: ${{ github.workspace }}/e2e/python
+
+  ts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # For debugging purposes
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CLI dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Install dependencies in e2e/typescript
+        run: npm install
+        working-directory: e2e/typescript
+
+      - name: Run tests in e2e/typescript
+        run: ../../bin/cli.js testing exec -- npx tsx run.ts
+        working-directory: e2e/typescript
