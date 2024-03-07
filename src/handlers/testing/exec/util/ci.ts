@@ -143,6 +143,7 @@ export async function makeCIContext(): Promise<CIContext> {
   // name of the merge commit for the PR, like 5/merge.
   const branchName = pullRequest?.head.ref || env.GITHUB_REF_NAME;
 
+  // Get the branch via the REST API so we can get its internal node ID
   const { data: ref } = await api.rest.git.getRef({
     owner: github.context.repo.owner,
     repo: github.context.repo.repo,
