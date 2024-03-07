@@ -10,6 +10,7 @@ concurrency:
 
 env:
   AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
 
 jobs:

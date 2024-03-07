@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getExecOutput } from '@actions/exec';
+import github from '@actions/github';
 import fs from 'fs/promises';
 
 export interface CIContext {
@@ -7,6 +8,7 @@ export interface CIContext {
   repoId: string;
   repoName: string;
   repoHtmlUrl: string;
+  branchId: string;
   branchName: string;
   defaultBranchName: string;
   ciProvider: 'github';
@@ -24,6 +26,7 @@ export interface CIContext {
 
 const zGitHubEnvSchema = z.object({
   GITHUB_ACTIONS: z.literal('true'),
+  GITHUB_TOKEN: z.string(),
   GITHUB_SERVER_URL: z.string(),
   GITHUB_REPOSITORY: z.string(),
   GITHUB_REF_NAME: z.string(),
@@ -124,6 +127,7 @@ async function parseCommitFromGitLog(sha: string): Promise<Commit> {
 export async function makeCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
   const commit = await parseCommitFromGitLog(env.GITHUB_SHA);
+  const api = github.getOctokit(env.GITHUB_TOKEN);
 
   // GitHub Actions are triggered by webhook events, and the event payload is
   // stored in a JSON file at $GITHUB_EVENT_PATH.
@@ -134,16 +138,25 @@ export async function makeCIContext(): Promise<CIContext> {
   const repository = repositoryFromEvent(event.repository);
   const pullRequest = pullRequestFromEvent(event.pull_request);
 
+  // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
+  // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
+  // name of the merge commit for the PR, like 5/merge.
+  const branchName = pullRequest?.head.ref || env.GITHUB_REF_NAME;
+
+  const { data: ref } = await api.rest.git.getRef({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    ref: `heads/${branchName}`,
+  });
+
   return {
     gitProvider: 'github',
     repoId: repository.id,
     // full repo name including owner, e.g. 'octocat/Hello-World'
     repoName: env.GITHUB_REPOSITORY,
     repoHtmlUrl: [env.GITHUB_SERVER_URL, env.GITHUB_REPOSITORY].join('/'),
-    // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
-    // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
-    // name of the merge commit for the PR, like 5/merge.
-    branchName: pullRequest?.head.ref || env.GITHUB_REF_NAME,
+    branchId: ref.node_id,
+    branchName,
     defaultBranchName: repository.default_branch,
     ciProvider: 'github',
     buildHtmlUrl: [

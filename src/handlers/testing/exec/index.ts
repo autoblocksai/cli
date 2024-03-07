@@ -143,8 +143,7 @@ class RunManager {
       repositoryExternalId: ciContext.repoId,
       repositoryName: ciContext.repoName,
       repositoryHtmlUrl: ciContext.repoHtmlUrl,
-      // TODO: figure out how to get internal branch ID from github
-      branchExternalId: ciContext.branchName,
+      branchExternalId: ciContext.branchId,
       branchName: ciContext.branchName,
       isDefaultBranch: ciContext.branchName === ciContext.defaultBranchName,
       ciProvider: ciContext.ciProvider,
