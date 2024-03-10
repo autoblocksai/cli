@@ -620,7 +620,7 @@ export async function exec(args: {
           errline: (data: string) => {
             emitter.emit(EventName.CONSOLE_LOG, {
               ctx: 'cmd',
-              level: 'error',
+              level: 'info',
               message: data,
             });
           },

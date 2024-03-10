@@ -12,14 +12,24 @@ type RunEnded = EventSchemas[EventName.RUN_ENDED];
 const MAX_TEST_CASES = 100;
 
 /**
- * Uses add() to ensure that the set is ordered by insertion order
+ * Uses add() to ensure that the list is ordered by insertion order
  *
  * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
  */
-function makeOrdereredSet(vals: string[]): Set<string> {
+function uniq(vals: string[]): string[] {
   const set = new Set<string>();
   vals.forEach((val) => set.add(val));
-  return set;
+  return Array.from(set);
+}
+
+function makeTestStatus(evals: Evaluation[]): 'pass' | 'fail' | 'no-results' {
+  if (evals.length === 0) {
+    return 'no-results';
+  } else if (evals.some((e) => e.passed === false)) {
+    return 'fail';
+  } else {
+    return 'pass';
+  }
 }
 
 const Space = () => <Text> </Text>;
@@ -60,22 +70,28 @@ function TestRow(props: {
   evals: Evaluation[];
   errors: UncaughtError[];
 }) {
-  const uniqEvaluatorExternalIds = makeOrdereredSet(
+  const uniqEvaluatorExternalIds = uniq(
     props.evals.map((e) => e.evaluatorExternalId),
   );
-  const uniqTestCaseHashes = makeOrdereredSet(
-    props.evals.map((e) => e.testCaseHash),
-  );
+  const uniqTestCaseHashes = uniq(props.evals.map((e) => e.testCaseHash));
 
-  const testDidPassOverall =
-    props.evals.every((e) => e.passed !== false) && props.errors.length === 0;
+  const testStatus = makeTestStatus(props.evals);
+  const testStatusColor = {
+    pass: 'green',
+    fail: 'red',
+    'no-results': 'gray',
+  }[testStatus];
+  const testStatusIcon = {
+    pass: '✓',
+    fail: '✗',
+    'no-results': '?',
+  }[testStatus];
+
   return (
     <Box flexDirection="column">
       <Box columnGap={1}>
         {props.runIsOver ? (
-          <Text color={testDidPassOverall ? 'green' : 'red'}>
-            {testDidPassOverall ? '✓' : '✗'}
-          </Text>
+          <Text color={testStatusColor}>{testStatusIcon}</Text>
         ) : (
           <Spinner type="dots" />
         )}
@@ -86,8 +102,11 @@ function TestRow(props: {
         </Text>
       </Box>
       <Box paddingLeft={2} columnGap={2}>
+        {props.runIsOver && testStatus === 'no-results' && (
+          <Text color="gray">No results.</Text>
+        )}
         <Box flexDirection="column">
-          {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
+          {uniqEvaluatorExternalIds.map((evaluatorExternalId) => {
             return (
               <Box key={evaluatorExternalId} columnGap={1}>
                 <Text color="gray">{evaluatorExternalId}</Text>
@@ -96,10 +115,10 @@ function TestRow(props: {
           })}
         </Box>
         <Box flexDirection="column">
-          {Array.from(uniqEvaluatorExternalIds).map((evaluatorExternalId) => {
+          {uniqEvaluatorExternalIds.map((evaluatorExternalId) => {
             return (
               <Box key={evaluatorExternalId} overflowX="hidden">
-                {Array.from(uniqTestCaseHashes)
+                {uniqTestCaseHashes
                   .slice(-1 * MAX_TEST_CASES)
                   .map((testCaseHash) => {
                     const passed = props.evals.find(
