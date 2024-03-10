@@ -94,12 +94,11 @@ class RunManager {
         Authorization: `Bearer ${this.apiKey}`,
       },
     });
+    const data = await resp.json();
     if (!resp.ok) {
-      throw new Error(
-        `POST ${path} failed: ${resp.status} ${await resp.text()}`,
-      );
+      throw new Error(`POST ${subpath}${path} failed: ${JSON.stringify(data)}`);
     }
-    return resp.json();
+    return data;
   }
 
   private get isCI(): boolean {
