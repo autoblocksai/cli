@@ -3,3 +3,4 @@
 CODEOWNERS
 *.sh
 *.txt
+.gitignore
