@@ -149,7 +149,7 @@ class RunManager {
       buildHtmlUrl: ciContext.buildHtmlUrl,
       commitSha: ciContext.commitSha,
       commitMessage: ciContext.commitMessage,
-      commitComitterName: ciContext.commitCommitterName,
+      commitCommitterName: ciContext.commitCommitterName,
       commitCommitterEmail: ciContext.commitCommitterEmail,
       commitAuthorName: ciContext.commitAuthorName,
       commitAuthorEmail: ciContext.commitAuthorEmail,
