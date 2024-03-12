@@ -1,4 +1,4 @@
-import { Box, Static, Text, render } from 'ink';
+import { Box, Spacer, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../emitter';
@@ -96,6 +96,15 @@ function TestRow(props: {
           <Spinner type="dots" />
         )}
         <Text bold={true}>{props.testExternalId}</Text>
+        {/* TODO: show URL for CI context as well */}
+        {!process.env.CI && (
+          <>
+            <Spacer />
+            <Text>
+              {`https://app.autoblocks.ai/testing/local/test/${encodeURIComponent(props.testExternalId)}`}
+            </Text>
+          </>
+        )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
         {props.runIsOver && testStatus === 'no-results' && (
