@@ -2,3 +2,5 @@
 *.py
 CODEOWNERS
 *.sh
+*.txt
+.gitignore

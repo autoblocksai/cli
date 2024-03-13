@@ -1,0 +1,9 @@
+{
+  "name": "ts-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "dependencies": {
+    "@autoblocks/client": "*",
+    "typescript": "*"
+  }
+}

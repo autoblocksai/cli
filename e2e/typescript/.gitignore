@@ -1,0 +1,4 @@
+# We don't want a package-lock for this project because
+# we want to be able to install the latest version of
+# the dependencies when we run the tests.
+package-lock.json

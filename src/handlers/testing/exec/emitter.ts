@@ -12,7 +12,7 @@ export enum EventName {
 
 // Zod schemas for event data
 const zConsoleLogSchema = z.object({
-  ctx: z.enum(['cmd', 'cli', 'cli-server']),
+  ctx: z.enum(['cmd', 'cli']),
   level: z.enum(['debug', 'info', 'warn', 'error']),
   message: z.string(),
 });
