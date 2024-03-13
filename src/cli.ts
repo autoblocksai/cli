@@ -5,6 +5,7 @@ import packageJson from '../package.json';
 import { renderOutdatedVersionComponent } from './components/outdated-version';
 import { handlers } from './handlers/index.js';
 import { AutoblocksTracer } from '@autoblocks/client';
+import { AUTOBLOCKS_WEBAPP_BASE_URL } from './util/constants';
 
 const packageName = packageJson.name;
 const packageVersion = packageJson.version;
@@ -46,7 +47,7 @@ const apiKeyMissingErrorMessage = `
 Autoblocks API key is required.
 Provide it via the AUTOBLOCKS_API_KEY environment variable or the --api-key option.
 
-You can get your API key from https://app.autoblocks.ai/settings/api-keys`;
+You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`;
 
 const parser = yargs(hideBin(process.argv))
   .command(

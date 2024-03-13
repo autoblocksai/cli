@@ -9,6 +9,7 @@ import { renderTestProgress } from './components/progress';
 import { EventName, emitter, type EventSchemas } from './emitter';
 import { makeCIContext, type CIContext } from './util/ci';
 import { findAvailablePort } from './util/net';
+import { AUTOBLOCKS_API_BASE_URL } from '../../../util/constants';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 
@@ -86,7 +87,7 @@ class RunManager {
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
     const subpath = this.isCI ? '/testing/ci' : '/testing/local';
-    const resp = await fetch(`https://api.autoblocks.ai${subpath}${path}`, {
+    const resp = await fetch(`${AUTOBLOCKS_API_BASE_URL}${subpath}${path}`, {
       method: 'POST',
       body: body ? JSON.stringify(body) : undefined,
       headers: {

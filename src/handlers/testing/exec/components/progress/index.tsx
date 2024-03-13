@@ -2,6 +2,7 @@ import { Box, Spacer, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../emitter';
+import { AUTOBLOCKS_WEBAPP_BASE_URL } from '../../../../../util/constants';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -101,7 +102,7 @@ function TestRow(props: {
           <>
             <Spacer />
             <Text>
-              {`https://app.autoblocks.ai/testing/local/test/${encodeURIComponent(props.testExternalId)}`}
+              {`${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/local/test/${encodeURIComponent(props.testExternalId)}`}
             </Text>
           </>
         )}
