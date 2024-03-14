@@ -5,6 +5,12 @@ on:
   # handling the git data correctly in each scenario
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      prompt-id:
+        type: string
+        description: The ID of the changed prompt that triggered this workflow
+        required: false
   schedule:
     - cron: '17 15 * * *'
 
