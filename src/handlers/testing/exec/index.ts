@@ -157,7 +157,7 @@ class RunManager {
       commitCommittedDate: ciContext.commitCommittedDate,
       pullRequestNumber: ciContext.pullRequestNumber,
       pullRequestTitle: ciContext.pullRequestTitle,
-      promptSnapshotId: ciContext.promptSnapshotId,
+      promptSnapshots: ciContext.promptSnapshots,
     });
 
     this.ciBuildId = id;
@@ -607,10 +607,12 @@ export async function exec(args: {
         ...process.env,
         AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
       };
-      if (ciContext?.promptSnapshotId) {
+      if (ciContext?.promptSnapshots) {
         // The prompt SDKs will use this environment variable to know that they
-        // need to pull down and use a prompt snapshot
-        commandEnv.AUTOBLOCKS_PROMPT_SNAPSHOT_ID = ciContext.promptSnapshotId;
+        // need to pull down and use prompt snapshot(s)
+        commandEnv.AUTOBLOCKS_PROMPT_SNAPSHOTS = JSON.stringify(
+          ciContext.promptSnapshots,
+        );
       }
 
       // Execute the command
