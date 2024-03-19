@@ -22,9 +22,9 @@ export interface CIContext {
   commitCommittedDate: string;
   pullRequestNumber: number | null;
   pullRequestTitle: string | null;
-  // The ID of the prompt snapshot that triggered this test run, if any.
+  // The prompt snapshot(s) that triggered this test run, if any.
   // This is parsed from the GitHub Actions workflow inputs.
-  promptSnapshotId: string | null;
+  promptSnapshots: PromptSnapshots | null;
 }
 
 const zGitHubEnvSchema = z.object({
@@ -62,21 +62,13 @@ const zRepositorySchema = z.object({
   default_branch: z.string(),
 });
 
-/**
- * For users with UI-triggered test runs configured, they'll
- * have their GitHub Actions workflow set up to receive the
- * prompt snapshot ID as an input. This schema is used to
- * parse that input out of the event.json file, which will
- * contain the workflow event payload.
- */
-const zWorkflowInputsSchema = z.object({
-  'prompt-snapshot-id': z.string(),
-});
+// Map of prompt external ID to a snapshot ID
+const zPromptSnapshotsSchema = z.record(z.string(), z.string());
 
 type Commit = z.infer<typeof zCommitSchema>;
 type PullRequest = z.infer<typeof zPullRequestSchema>;
 type Repository = z.infer<typeof zRepositorySchema>;
-type WorkflowInputs = z.infer<typeof zWorkflowInputsSchema>;
+type PromptSnapshots = z.infer<typeof zPromptSnapshotsSchema>;
 
 function pullRequestFromEvent(event: {
   pull_request?: unknown;
@@ -92,14 +84,25 @@ function repositoryFromEvent(event: { repository?: unknown }): Repository {
   return zRepositorySchema.parse(event.repository);
 }
 
-function workflowInputsFromEvent(event: {
-  inputs?: unknown;
-}): WorkflowInputs | null {
-  const parsed = zWorkflowInputsSchema.safeParse(event.inputs);
-  if (parsed.success) {
-    return parsed.data;
+/**
+ * For users with UI-triggered test runs configured, they'll
+ * have their GitHub Actions workflow set up to receive the
+ * prompt snapshots as an input. This function is used to
+ * parse that input out of the event.json file, which will
+ * contain the workflow event payload.
+ */
+function promptSnapshotsFromEvent(event: {
+  inputs?: Record<string, unknown>;
+}): PromptSnapshots | null {
+  const promptSnapshotsRaw = event.inputs?.['prompt-snapshots'];
+  if (!promptSnapshotsRaw) {
+    return null;
   }
-  return null;
+
+  // This will throw if prompt-snapshots is not valid, but that is
+  // desired because we want to stop the workflow if the input is
+  // not what we expect.
+  return zPromptSnapshotsSchema.parse(JSON.parse(`${promptSnapshotsRaw}`));
 }
 
 async function parseCommitFromGitLog(sha: string): Promise<Commit> {
@@ -164,7 +167,7 @@ export async function makeCIContext(): Promise<CIContext> {
 
   const repository = repositoryFromEvent(event);
   const pullRequest = pullRequestFromEvent(event);
-  const workflowInputs = workflowInputsFromEvent(event);
+  const promptSnapshots = promptSnapshotsFromEvent(event);
 
   // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
   // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
@@ -206,6 +209,6 @@ export async function makeCIContext(): Promise<CIContext> {
     commitCommittedDate: commit.committedDate,
     pullRequestNumber: pullRequest?.number ?? null,
     pullRequestTitle: pullRequest?.title || null,
-    promptSnapshotId: workflowInputs?.['prompt-snapshot-id'] || null,
+    promptSnapshots,
   };
 }
