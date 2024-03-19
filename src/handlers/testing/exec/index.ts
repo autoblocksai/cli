@@ -125,11 +125,11 @@ class RunManager {
     return this.ciContext;
   }
 
-  async setup(): Promise<void> {
+  async setupCIContext(): Promise<CIContext | null> {
     const ciContext = await this.makeCIContext();
 
     if (!ciContext) {
-      return;
+      return null;
     }
 
     emitter.emit(EventName.CONSOLE_LOG, {
@@ -157,9 +157,12 @@ class RunManager {
       commitCommittedDate: ciContext.commitCommittedDate,
       pullRequestNumber: ciContext.pullRequestNumber,
       pullRequestTitle: ciContext.pullRequestTitle,
+      promptSnapshotId: ciContext.promptSnapshotId,
     });
 
     this.ciBuildId = id;
+
+    return ciContext;
   }
 
   async handleStartRun(args: { testExternalId: string }): Promise<string> {
@@ -554,7 +557,7 @@ export async function exec(args: {
     runMessage: args.runMessage,
   });
 
-  await runManager.setup();
+  const ciContext = await runManager.setupCIContext();
 
   let runningServer: ServerType | undefined = undefined;
 
@@ -599,13 +602,20 @@ export async function exec(args: {
         message: `Running command: ${args.command} ${args.commandArgs.join(' ')}`,
       });
 
+      // Set environment variables for the SDKs to use
+      const commandEnv: Record<string, string> = {
+        ...process.env,
+        AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
+      };
+      if (ciContext?.promptSnapshotId) {
+        // The prompt SDKs will use this environment variable to know that they
+        // need to pull down and use a prompt snapshot
+        commandEnv.AUTOBLOCKS_PROMPT_SNAPSHOT_ID = ciContext.promptSnapshotId;
+      }
+
       // Execute the command
       execCommand(args.command, args.commandArgs, {
-        // Set environment variables for the SDKs to use
-        env: {
-          ...process.env,
-          AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
-        },
+        env: commandEnv,
         // will return error code as response (even if it's non-zero)
         ignoreReturnCode: true,
         silent: true,

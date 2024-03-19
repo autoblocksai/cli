@@ -22,6 +22,9 @@ export interface CIContext {
   commitCommittedDate: string;
   pullRequestNumber: number | null;
   pullRequestTitle: string | null;
+  // The ID of the prompt snapshot that triggered this test run, if any.
+  // This is parsed from the GitHub Actions workflow inputs.
+  promptSnapshotId: string | null;
 }
 
 const zGitHubEnvSchema = z.object({
@@ -59,20 +62,44 @@ const zRepositorySchema = z.object({
   default_branch: z.string(),
 });
 
+/**
+ * For users with UI-triggered test runs configured, they'll
+ * have their GitHub Actions workflow set up to receive the
+ * prompt snapshot ID as an input. This schema is used to
+ * parse that input out of the event.json file, which will
+ * contain the workflow event payload.
+ */
+const zWorkflowInputsSchema = z.object({
+  'prompt-snapshot-id': z.string(),
+});
+
 type Commit = z.infer<typeof zCommitSchema>;
 type PullRequest = z.infer<typeof zPullRequestSchema>;
 type Repository = z.infer<typeof zRepositorySchema>;
+type WorkflowInputs = z.infer<typeof zWorkflowInputsSchema>;
 
-function pullRequestFromEvent(event: unknown): PullRequest | null {
-  const parsed = zPullRequestSchema.safeParse(event);
+function pullRequestFromEvent(event: {
+  pull_request?: unknown;
+}): PullRequest | null {
+  const parsed = zPullRequestSchema.safeParse(event.pull_request);
   if (parsed.success) {
     return parsed.data;
   }
   return null;
 }
 
-function repositoryFromEvent(event: unknown): Repository {
-  return zRepositorySchema.parse(event);
+function repositoryFromEvent(event: { repository?: unknown }): Repository {
+  return zRepositorySchema.parse(event.repository);
+}
+
+function workflowInputsFromEvent(event: {
+  inputs?: unknown;
+}): WorkflowInputs | null {
+  const parsed = zWorkflowInputsSchema.safeParse(event.inputs);
+  if (parsed.success) {
+    return parsed.data;
+  }
+  return null;
 }
 
 async function parseCommitFromGitLog(sha: string): Promise<Commit> {
@@ -135,8 +162,9 @@ export async function makeCIContext(): Promise<CIContext> {
   // https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads
   const event = JSON.parse(await fs.readFile(env.GITHUB_EVENT_PATH, 'utf-8'));
 
-  const repository = repositoryFromEvent(event.repository);
-  const pullRequest = pullRequestFromEvent(event.pull_request);
+  const repository = repositoryFromEvent(event);
+  const pullRequest = pullRequestFromEvent(event);
+  const workflowInputs = workflowInputsFromEvent(event);
 
   // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
   // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
@@ -178,5 +206,6 @@ export async function makeCIContext(): Promise<CIContext> {
     commitCommittedDate: commit.committedDate,
     pullRequestNumber: pullRequest?.number ?? null,
     pullRequestTitle: pullRequest?.title || null,
+    promptSnapshotId: workflowInputs?.['prompt-snapshot-id'] || null,
   };
 }
