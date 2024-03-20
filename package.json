@@ -33,7 +33,7 @@
     "@actions/github": "^6.0.0",
     "@autoblocks/client": "^0.0.37",
     "@hono/node-server": "^1.7.0",
-    "@hono/zod-validator": "^0.1.11",
+    "@hono/zod-validator": "^0.2.0",
     "hono": "^3.12.12",
     "ink": "^4.0.0",
     "ink-spinner": "^5.0.0",
