@@ -7,7 +7,7 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      prompt-snapshots:
+      autoblocks-prompt-snapshots:
         type: string
         description: The prompt snapshot(s) that triggered this workflow
         required: false

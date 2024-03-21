@@ -94,12 +94,12 @@ function repositoryFromEvent(event: { repository?: unknown }): Repository {
 function promptSnapshotsFromEvent(event: {
   inputs?: Record<string, unknown>;
 }): PromptSnapshots | null {
-  const promptSnapshotsRaw = event.inputs?.['prompt-snapshots'];
+  const promptSnapshotsRaw = event.inputs?.['autoblocks-prompt-snapshots'];
   if (!promptSnapshotsRaw) {
     return null;
   }
 
-  // This will throw if prompt-snapshots is not valid, but that is
+  // This will throw if autoblocks-prompt-snapshots is not valid, but that is
   // desired because we want to stop the workflow if the input is
   // not what we expect.
   return zPromptSnapshotsSchema.parse(JSON.parse(`${promptSnapshotsRaw}`));
