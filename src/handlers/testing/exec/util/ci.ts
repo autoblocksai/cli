@@ -13,6 +13,8 @@ export interface CIContext {
   defaultBranchName: string;
   ciProvider: 'github';
   buildHtmlUrl: string;
+  workflowName: string;
+  workflowRunNumber: string;
   commitSha: string;
   commitMessage: string;
   commitCommitterName: string;
@@ -37,6 +39,8 @@ const zGitHubEnvSchema = z.object({
   GITHUB_SHA: z.string(),
   GITHUB_RUN_ID: z.string(),
   GITHUB_RUN_ATTEMPT: z.string(),
+  GITHUB_WORKFLOW: z.string(),
+  GITHUB_RUN_NUMBER: z.string(),
 });
 
 const zCommitSchema = z.object({
@@ -200,6 +204,8 @@ export async function makeCIContext(): Promise<CIContext> {
       'attempts',
       env.GITHUB_RUN_ATTEMPT,
     ].join('/'),
+    workflowName: env.GITHUB_WORKFLOW,
+    workflowRunNumber: env.GITHUB_RUN_NUMBER,
     commitSha: commit.sha,
     commitMessage: commit.message,
     commitCommitterName: commit.committerName,

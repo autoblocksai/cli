@@ -77,6 +77,12 @@ const parser = yargs(hideBin(process.argv))
           type: 'boolean',
           default: false,
         })
+        .option('slack-webhook-url', {
+          describe:
+            'Slack webhook URL where results are posted. Can be set via the AUTOBLOCKS_SLACK_WEBHOOK_URL environment variable.',
+          type: 'string',
+          default: process.env.AUTOBLOCKS_SLACK_WEBHOOK_URL,
+        })
         .demandOption('api-key', apiKeyMissingErrorMessage)
         .help();
     },
@@ -104,6 +110,7 @@ npx autoblocks testing exec -- echo "Hello, world!
         runMessage: argv.message,
         port: argv.port,
         exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
+        slackWebhookUrl: argv['slack-webhook-url'],
       });
     },
   )
