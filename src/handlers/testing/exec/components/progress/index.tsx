@@ -1,8 +1,10 @@
 import { Box, Spacer, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
-import { EventName, emitter, type EventSchemas } from '../../emitter';
+import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { AUTOBLOCKS_WEBAPP_BASE_URL } from '../../../../../util/constants';
+import { testRunStatusFromEvaluations } from '../../util/evals';
+import { TestRunStatus } from '../../util/models';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -21,16 +23,6 @@ function uniq(vals: string[]): string[] {
   const set = new Set<string>();
   vals.forEach((val) => set.add(val));
   return Array.from(set);
-}
-
-function makeTestStatus(evals: Evaluation[]): 'pass' | 'fail' | 'no-results' {
-  if (evals.length === 0) {
-    return 'no-results';
-  } else if (evals.some((e) => e.passed === false)) {
-    return 'fail';
-  } else {
-    return 'pass';
-  }
 }
 
 const Space = () => <Text> </Text>;
@@ -76,17 +68,17 @@ function TestRow(props: {
   );
   const uniqTestCaseHashes = uniq(props.evals.map((e) => e.testCaseHash));
 
-  const testStatus = makeTestStatus(props.evals);
-  const testStatusColor = {
-    pass: 'green',
-    fail: 'red',
-    'no-results': 'gray',
-  }[testStatus];
-  const testStatusIcon = {
-    pass: '✓',
-    fail: '✗',
-    'no-results': '?',
-  }[testStatus];
+  const testStatus = testRunStatusFromEvaluations(props.evals);
+  const statusToColorAndIcon: Record<
+    TestRunStatus,
+    { color: string; icon: string }
+  > = {
+    [TestRunStatus.PASSED]: { color: 'green', icon: '✓' },
+    [TestRunStatus.FAILED]: { color: 'red', icon: '✗' },
+    [TestRunStatus.NO_RESULTS]: { color: 'gray', icon: '?' },
+  };
+  const { color: testStatusColor, icon: testStatusIcon } =
+    statusToColorAndIcon[testStatus];
 
   return (
     <Box flexDirection="column">
@@ -108,7 +100,7 @@ function TestRow(props: {
         )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
-        {props.runIsOver && testStatus === 'no-results' && (
+        {props.runIsOver && testStatus === TestRunStatus.NO_RESULTS && (
           <Text color="gray">No results.</Text>
         )}
         <Box flexDirection="column">

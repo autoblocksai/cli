@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { z } from 'zod';
+import { zEvaluationSchema } from './models';
 
 // Enum for event names
 export enum EventName {
@@ -28,13 +29,6 @@ const zUncaughtErrorSchema = z.object({
     message: z.string(),
     stacktrace: z.string(),
   }),
-});
-
-const zEvaluationSchema = z.object({
-  testExternalId: z.string(),
-  evaluatorExternalId: z.string(),
-  testCaseHash: z.string(),
-  passed: z.boolean().nullable(),
 });
 
 const zRunStartedSchema = z.object({

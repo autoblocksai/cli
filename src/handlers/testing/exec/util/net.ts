@@ -1,5 +1,5 @@
 import net from 'net';
-import { emitter, EventName } from '../emitter';
+import { emitter, EventName } from './emitter';
 
 export async function findAvailablePort(args: {
   startPort: number;

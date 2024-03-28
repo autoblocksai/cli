@@ -6,23 +6,14 @@ import { Hono, type Context } from 'hono';
 
 import { z, type SafeParseReturnType } from 'zod';
 import { renderTestProgress } from './components/progress';
-import { EventName, emitter, type EventSchemas } from './emitter';
+import { EventName, emitter, type EventSchemas } from './util/emitter';
 import { makeCIContext, type CIContext } from './util/ci';
 import { findAvailablePort } from './util/net';
 import { AUTOBLOCKS_API_BASE_URL } from '../../../util/constants';
+import type { Evaluation, TestCaseEvent } from './util/models';
+import { postSlackMessage } from './util/slack';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
-
-interface TestCaseEvent {
-  testExternalId: string;
-  testCaseHash: string;
-  event: {
-    message: string;
-    traceId: string;
-    timestamp: string;
-    properties?: unknown;
-  };
-}
 
 /**
  * Manages the state of the current run
@@ -30,6 +21,9 @@ interface TestCaseEvent {
 class RunManager {
   private readonly apiKey: string;
   private readonly message: string | undefined;
+
+  private readonly startTime: Date;
+  private endTime: Date | undefined = undefined;
 
   /**
    * Keep a map of each test's external ID to its run ID
@@ -53,14 +47,12 @@ class RunManager {
   /**
    * Keep track of uncaught errors
    */
-  uncaughtErrors: UncaughtError[];
+  private uncaughtErrors: UncaughtError[];
 
   /**
-   * Keep track of whether or not there was ever an evaluation that did not pass
-   *
-   * This is used to determine the final exit code of the process
+   * Keep track of evaluations
    */
-  hasAnyFailedEvaluations: boolean;
+  private evaluations: Evaluation[];
 
   /**
    * The CI context, parsed from environment variables and local git data.
@@ -68,21 +60,23 @@ class RunManager {
   private ciContext: CIContext | undefined;
 
   /**
-   * Only relevant for CI runs. This is returned from our REST API
+   * Only relevant for CI runs. These are returned from our REST API
    * when we POST to /builds at the beginning of a build on CI.
    * It's used in subsequent requests to associate runs with the build.
    */
   private ciBuildId: string | undefined;
+  private ciBranchId: string | undefined;
 
   constructor(args: { apiKey: string; runMessage: string | undefined }) {
     this.apiKey = args.apiKey;
     this.message = args.runMessage;
+    this.startTime = new Date();
 
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
     this.uncaughtErrors = [];
-    this.hasAnyFailedEvaluations = false;
+    this.evaluations = [];
   }
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
@@ -138,29 +132,33 @@ class RunManager {
       message: `Running in CI environment: ${JSON.stringify(ciContext, null, 2)}`,
     });
 
-    const { id } = await this.post<{ id: string }>('/builds', {
-      gitProvider: ciContext.gitProvider,
-      repositoryExternalId: ciContext.repoId,
-      repositoryName: ciContext.repoName,
-      repositoryHtmlUrl: ciContext.repoHtmlUrl,
-      branchExternalId: ciContext.branchId,
-      branchName: ciContext.branchName,
-      isDefaultBranch: ciContext.branchName === ciContext.defaultBranchName,
-      ciProvider: ciContext.ciProvider,
-      buildHtmlUrl: ciContext.buildHtmlUrl,
-      commitSha: ciContext.commitSha,
-      commitMessage: ciContext.commitMessage,
-      commitCommitterName: ciContext.commitCommitterName,
-      commitCommitterEmail: ciContext.commitCommitterEmail,
-      commitAuthorName: ciContext.commitAuthorName,
-      commitAuthorEmail: ciContext.commitAuthorEmail,
-      commitCommittedDate: ciContext.commitCommittedDate,
-      pullRequestNumber: ciContext.pullRequestNumber,
-      pullRequestTitle: ciContext.pullRequestTitle,
-      promptSnapshots: ciContext.promptSnapshots,
-    });
+    const { id, branchId } = await this.post<{ id: string; branchId: string }>(
+      '/builds',
+      {
+        gitProvider: ciContext.gitProvider,
+        repositoryExternalId: ciContext.repoId,
+        repositoryName: ciContext.repoName,
+        repositoryHtmlUrl: ciContext.repoHtmlUrl,
+        branchExternalId: ciContext.branchId,
+        branchName: ciContext.branchName,
+        isDefaultBranch: ciContext.branchName === ciContext.defaultBranchName,
+        ciProvider: ciContext.ciProvider,
+        buildHtmlUrl: ciContext.buildHtmlUrl,
+        commitSha: ciContext.commitSha,
+        commitMessage: ciContext.commitMessage,
+        commitCommitterName: ciContext.commitCommitterName,
+        commitCommitterEmail: ciContext.commitCommitterEmail,
+        commitAuthorName: ciContext.commitAuthorName,
+        commitAuthorEmail: ciContext.commitAuthorEmail,
+        commitCommittedDate: ciContext.commitCommittedDate,
+        pullRequestNumber: ciContext.pullRequestNumber,
+        pullRequestTitle: ciContext.pullRequestTitle,
+        promptSnapshots: ciContext.promptSnapshots,
+      },
+    );
 
     this.ciBuildId = id;
+    this.ciBranchId = branchId;
 
     return ciContext;
   }
@@ -189,6 +187,10 @@ class RunManager {
     }
   }
 
+  /**
+   * Used during cleanup to ensure all runs are ended in case the process
+   * terminates prematurely.
+   */
   async endAllRuns() {
     const testIdsToEnd = Object.keys(this.testExternalIdToRunId);
     await Promise.allSettled(
@@ -308,19 +310,21 @@ class RunManager {
     };
     metadata?: unknown;
   }): Promise<void> {
-    let passed: boolean | undefined = undefined;
+    let passed: boolean | null;
+
+    // A pass/fail status is only set if there is a threshold
     if (args.threshold) {
       passed = this.evaluationPassed({
         score: args.score,
         threshold: args.threshold,
       });
+    } else {
+      passed = null;
     }
 
     emitter.emit(EventName.EVALUATION, {
       ...args,
-      // The test case progress component uses null to differentiate between
-      // "not run yet" and "has no pass / fail status"
-      passed: passed === undefined ? null : passed,
+      passed,
     });
 
     const testCaseResultId =
@@ -344,8 +348,67 @@ class RunManager {
       metadata: args.metadata,
     });
 
-    if (passed === false) {
-      this.hasAnyFailedEvaluations = true;
+    this.evaluations.push({
+      testExternalId: args.testExternalId,
+      evaluatorExternalId: args.evaluatorExternalId,
+      testCaseHash: args.testCaseHash,
+      passed,
+    });
+  }
+
+  hasUncaughtErrors(): boolean {
+    return this.uncaughtErrors.length > 0;
+  }
+
+  hasAnyFailedEvaluations(): boolean {
+    return this.evaluations.some((e) => e.passed === false);
+  }
+
+  setEndTime() {
+    if (this.endTime) {
+      throw new Error('End time already set');
+    }
+    this.endTime = new Date();
+  }
+
+  async postSlackMessage(args: { webhookUrl: string }) {
+    if (
+      !this.ciBranchId ||
+      !this.ciBuildId ||
+      !this.ciContext ||
+      !this.endTime ||
+      this.evaluations.length === 0
+    ) {
+      const nameToMissing = {
+        ciBranchId: !this.ciBranchId,
+        ciBuildId: !this.ciBuildId,
+        ciContext: !this.ciContext,
+        endTime: !this.endTime,
+        evaluations: this.evaluations.length === 0,
+      };
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'error',
+        message: `Can't post to Slack because some required data is missing: ${JSON.stringify(nameToMissing)}`,
+      });
+      return;
+    }
+
+    try {
+      await postSlackMessage({
+        webhookUrl: args.webhookUrl,
+        buildId: this.ciBuildId,
+        branchId: this.ciBranchId,
+        ciContext: this.ciContext,
+        runDurationMs: this.endTime.getTime() - this.startTime.getTime(),
+        evaluations: this.evaluations,
+      });
+    } catch (err) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'error',
+        message: `Failed to post to Slack: ${err}`,
+      });
     }
   }
 }
@@ -543,6 +606,7 @@ export async function exec(args: {
   runMessage: string | undefined;
   port: number;
   exit1OnEvaluationFailure: boolean;
+  slackWebhookUrl: string | undefined;
 }) {
   let listenersCreated = false;
   renderTestProgress({ onListenersCreated: () => (listenersCreated = true) });
@@ -565,21 +629,37 @@ export async function exec(args: {
 
   let commandExitCode: number = 0;
 
+  /**
+   * Clean up and exit. This function is called when:
+   * * the process receives a signal, or
+   * * the command has finished executing
+   */
   async function cleanup() {
+    // End any runs that haven't already been ended
     await runManager.endAllRuns();
 
+    // Shut down the server
     runningServer?.close();
 
-    if (runManager.uncaughtErrors.length > 0) {
+    // Exit with code 1 if there were any uncaught errors
+    if (runManager.hasUncaughtErrors()) {
       process.exit(1);
     }
 
-    if (runManager.hasAnyFailedEvaluations && args.exit1OnEvaluationFailure) {
+    // Exit with code 1 if there were any failed evaluations and
+    // the user has requested a non-zero exit code on evaluation failure
+    if (runManager.hasAnyFailedEvaluations() && args.exit1OnEvaluationFailure) {
       process.exit(1);
     }
 
+    // Exit with the underlying command's exit code
     process.exit(commandExitCode);
   }
+
+  // Attempt to clean up when the process receives a signal
+  ['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) =>
+    process.on(signal, cleanup),
+  );
 
   const port = await findAvailablePort({ startPort: args.port });
   runningServer = serve(
@@ -645,12 +725,22 @@ export async function exec(args: {
           commandExitCode = 1;
         })
         .finally(async () => {
+          runManager.setEndTime();
+
+          if (args.slackWebhookUrl) {
+            // Post to Slack if a webhook URL has been set.
+            // Note: this doesn't happen in cleanup() because that
+            // function is also called during unexpected termination
+            // and makes a best effort to clean up resources, whereas
+            // we only want to post to Slack if the command has
+            // successfully executed.
+            await runManager.postSlackMessage({
+              webhookUrl: args.slackWebhookUrl,
+            });
+          }
+
           await cleanup();
         });
     },
-  );
-
-  ['SIGINT', 'SIGTERM', 'SIGQUIT'].forEach((signal) =>
-    process.on(signal, cleanup),
   );
 }
