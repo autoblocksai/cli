@@ -1,5 +1,5 @@
 import { CIContext } from './ci';
-import { testRunStatusFromEvaluations } from './evals';
+import { makeTestRunStatusFromEvaluations } from './evals';
 import { Evaluation, TestRunStatus } from './models';
 
 // Commit messages are truncated if they're longer than this
@@ -109,7 +109,7 @@ function makeStatusHeaderSection(args: {
     [TestRunStatus.NO_RESULTS]: 'NO RESULTS',
   };
 
-  const status = testRunStatusFromEvaluations(args.evaluations);
+  const status = makeTestRunStatusFromEvaluations(args.evaluations);
   const statusIcon = statusToIcon[status];
   const statusLabel = statusToLabel[status];
   const duration = makeDurationString(args.runDurationMs);
@@ -170,7 +170,7 @@ function makeSectionsForTestSuite(args: {
     [TestRunStatus.NO_RESULTS]: ':grey_question:',
   };
 
-  const status = testRunStatusFromEvaluations(args.evaluations);
+  const status = makeTestRunStatusFromEvaluations(args.evaluations);
   const statusEmoji = statusToEmoji[status];
 
   return [

@@ -3,7 +3,7 @@ import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { AUTOBLOCKS_WEBAPP_BASE_URL } from '../../../../../util/constants';
-import { testRunStatusFromEvaluations } from '../../util/evals';
+import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { TestRunStatus } from '../../util/models';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
@@ -68,7 +68,7 @@ function TestRow(props: {
   );
   const uniqTestCaseHashes = uniq(props.evals.map((e) => e.testCaseHash));
 
-  const testStatus = testRunStatusFromEvaluations(props.evals);
+  const testStatus = makeTestRunStatusFromEvaluations(props.evals);
   const statusToColorAndIcon: Record<
     TestRunStatus,
     { color: string; icon: string }

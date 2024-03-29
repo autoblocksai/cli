@@ -1,6 +1,6 @@
 import { type Evaluation, TestRunStatus } from './models';
 
-export function testRunStatusFromEvaluations(
+export function makeTestRunStatusFromEvaluations(
   evals: Evaluation[],
 ): TestRunStatus {
   if (evals.length === 0) {
