@@ -15,8 +15,6 @@ on:
     - cron: '17 15 * * *'
 
 env:
-  AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
 
 jobs:
@@ -50,11 +48,21 @@ jobs:
         run: pip install -r requirements.txt
         working-directory: e2e/python
 
+      # Set the AUTOBLOCKS_SLACK_WEBHOOK_URL environment variable
+      # if this workflow was triggered by a scheduled run, since
+      # we only want to post to Slack on scheduled runs and not on
+      # every push or pull request.
+      - name: Set Slack webhook URL
+        if: github.event_name == 'schedule'
+        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+
       - name: Run tests in e2e/python
         run: ../../bin/cli.js testing exec -- python3 run.py
         working-directory: e2e/python
         env:
           PYTHONPATH: ${{ github.workspace }}/e2e/python
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
   ts:
     name: typescript-e2e-${{ github.event_name }}
@@ -86,6 +94,17 @@ jobs:
         run: npm install
         working-directory: e2e/typescript
 
+      # Set the AUTOBLOCKS_SLACK_WEBHOOK_URL environment variable
+      # if this workflow was triggered by a scheduled run, since
+      # we only want to post to Slack on scheduled runs and not on
+      # every push or pull request.
+      - name: Set Slack webhook URL
+        if: github.event_name == 'schedule'
+        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+
       - name: Run tests in e2e/typescript
         run: ../../bin/cli.js testing exec -- npx tsx run.ts
         working-directory: e2e/typescript
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}

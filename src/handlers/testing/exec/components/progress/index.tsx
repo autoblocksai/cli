@@ -1,8 +1,10 @@
 import { Box, Spacer, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
-import { EventName, emitter, type EventSchemas } from '../../emitter';
+import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { AUTOBLOCKS_WEBAPP_BASE_URL } from '../../../../../util/constants';
+import { makeTestRunStatusFromEvaluations } from '../../util/evals';
+import { EvaluationPassed, TestRunStatus } from '../../util/models';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -23,34 +25,30 @@ function uniq(vals: string[]): string[] {
   return Array.from(set);
 }
 
-function makeTestStatus(evals: Evaluation[]): 'pass' | 'fail' | 'no-results' {
-  if (evals.length === 0) {
-    return 'no-results';
-  } else if (evals.some((e) => e.passed === false)) {
-    return 'fail';
-  } else {
-    return 'pass';
-  }
-}
-
 const Space = () => <Text> </Text>;
 
-function colorFromPassed(passed: boolean | null | undefined): string {
+function makeColorFromEvaluationPassed(
+  passed: EvaluationPassed | undefined,
+): string {
   switch (passed) {
-    case true:
+    case EvaluationPassed.TRUE:
       return 'green';
-    case false:
+    case EvaluationPassed.FALSE:
       return 'red';
-    case null:
+    case EvaluationPassed.NOT_APPLICABLE:
       return 'yellow';
     case undefined:
+      // This means the test case has been seen but this particular evaluator
+      // has not evaluated it yet. In this case we show a gray dot.
       return 'gray';
     default:
       return 'gray';
   }
 }
 
-function colorFromLogLevel(level: 'debug' | 'info' | 'warn' | 'error'): string {
+function makeColorFromLogLevel(
+  level: 'debug' | 'info' | 'warn' | 'error',
+): string {
   switch (level) {
     case 'debug':
       return 'cyan';
@@ -76,17 +74,17 @@ function TestRow(props: {
   );
   const uniqTestCaseHashes = uniq(props.evals.map((e) => e.testCaseHash));
 
-  const testStatus = makeTestStatus(props.evals);
-  const testStatusColor = {
-    pass: 'green',
-    fail: 'red',
-    'no-results': 'gray',
-  }[testStatus];
-  const testStatusIcon = {
-    pass: '✓',
-    fail: '✗',
-    'no-results': '?',
-  }[testStatus];
+  const testStatus = makeTestRunStatusFromEvaluations(props.evals);
+  const statusToColorAndIcon: Record<
+    TestRunStatus,
+    { color: string; icon: string }
+  > = {
+    [TestRunStatus.PASSED]: { color: 'green', icon: '✓' },
+    [TestRunStatus.FAILED]: { color: 'red', icon: '✗' },
+    [TestRunStatus.NO_RESULTS]: { color: 'gray', icon: '?' },
+  };
+  const { color: testStatusColor, icon: testStatusIcon } =
+    statusToColorAndIcon[testStatus];
 
   return (
     <Box flexDirection="column">
@@ -108,7 +106,7 @@ function TestRow(props: {
         )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
-        {props.runIsOver && testStatus === 'no-results' && (
+        {props.runIsOver && testStatus === TestRunStatus.NO_RESULTS && (
           <Text color="gray">No results.</Text>
         )}
         <Box flexDirection="column">
@@ -127,11 +125,14 @@ function TestRow(props: {
                 {uniqTestCaseHashes
                   .slice(-1 * MAX_TEST_CASES)
                   .map((testCaseHash) => {
-                    const passed = props.evals.find(
-                      (e) =>
-                        e.evaluatorExternalId === evaluatorExternalId &&
-                        e.testCaseHash === testCaseHash,
-                    )?.passed;
+                    // If this is undefined it means that this evaluator has not
+                    // evaluated this test case yet.
+                    const passed: EvaluationPassed | undefined =
+                      props.evals.find(
+                        (e) =>
+                          e.evaluatorExternalId === evaluatorExternalId &&
+                          e.testCaseHash === testCaseHash,
+                      )?.passed;
                     const hasUncaughtError = props.errors.some(
                       (e) =>
                         e.testCaseHash === testCaseHash &&
@@ -142,7 +143,9 @@ function TestRow(props: {
                       <Text
                         key={testCaseHash}
                         color={
-                          hasUncaughtError ? 'white' : colorFromPassed(passed)
+                          hasUncaughtError
+                            ? 'white'
+                            : makeColorFromEvaluationPassed(passed)
                         }
                       >
                         {'.'}
@@ -229,7 +232,7 @@ const App = (props: { onListenersCreated: () => void }) => {
                 {log.ctx}
                 {']'}
               </Text>
-              <Text color={colorFromLogLevel(log.level)} bold={true}>
+              <Text color={makeColorFromLogLevel(log.level)} bold={true}>
                 {'['}
                 {log.level.toUpperCase()}
                 {']'}
