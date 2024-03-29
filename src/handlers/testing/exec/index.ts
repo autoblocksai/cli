@@ -406,6 +406,11 @@ class RunManager {
         runDurationMs: this.endTime.getTime() - this.startTime.getTime(),
         evaluations: this.evaluations,
       });
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'info',
+        message: 'Successfully posted message to Slack',
+      });
     } catch (err) {
       emitter.emit(EventName.CONSOLE_LOG, {
         ctx: 'cli',
