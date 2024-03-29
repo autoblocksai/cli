@@ -343,10 +343,20 @@ class RunManager {
       testExternalId: args.testExternalId,
     });
 
+    // Our /evaluations endpoint expects `passed` to be either:
+    // - true (passed)
+    // - false (failed)
+    // - undefined (not applicable)
+    const passedForApi = {
+      [EvaluationPassed.TRUE]: true,
+      [EvaluationPassed.FALSE]: false,
+      [EvaluationPassed.NOT_APPLICABLE]: undefined,
+    }[passed];
+
     await this.post(`/runs/${runId}/results/${testCaseResultId}/evaluations`, {
       evaluatorExternalId: args.evaluatorExternalId,
       score: args.score,
-      passed,
+      passed: passedForApi,
       threshold: args.threshold,
       metadata: args.metadata,
     });
