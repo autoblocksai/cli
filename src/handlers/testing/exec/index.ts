@@ -10,7 +10,7 @@ import { EventName, emitter, type EventSchemas } from './util/emitter';
 import { makeCIContext, type CIContext } from './util/ci';
 import { findAvailablePort } from './util/net';
 import { AUTOBLOCKS_API_BASE_URL } from '../../../util/constants';
-import type { Evaluation, TestCaseEvent } from './util/models';
+import { Evaluation, EvaluationPassed, TestCaseEvent } from './util/models';
 import { postSlackMessage } from './util/slack';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -272,7 +272,7 @@ class RunManager {
       resultId;
   }
 
-  private evaluationPassed(args: {
+  private determineIfEvaluationPassed(args: {
     score: number;
     threshold: {
       lt?: number;
@@ -280,7 +280,7 @@ class RunManager {
       gt?: number;
       gte?: number;
     };
-  }): boolean {
+  }): EvaluationPassed {
     const results: boolean[] = [];
     if (args.threshold.lt !== undefined) {
       results.push(args.score < args.threshold.lt);
@@ -294,7 +294,9 @@ class RunManager {
     if (args.threshold.gte !== undefined) {
       results.push(args.score >= args.threshold.gte);
     }
-    return results.every((r) => r);
+    return results.every((r) => r)
+      ? EvaluationPassed.TRUE
+      : EvaluationPassed.FALSE;
   }
 
   async handleTestCaseEval(args: {
@@ -310,16 +312,17 @@ class RunManager {
     };
     metadata?: unknown;
   }): Promise<void> {
-    let passed: boolean | null;
+    let passed: EvaluationPassed;
 
-    // A pass/fail status is only set if there is a threshold
     if (args.threshold) {
-      passed = this.evaluationPassed({
+      // A pass/fail status is only set if there is a threshold
+      passed = this.determineIfEvaluationPassed({
         score: args.score,
         threshold: args.threshold,
       });
     } else {
-      passed = null;
+      // Otherwise it's not applicable
+      passed = EvaluationPassed.NOT_APPLICABLE;
     }
 
     emitter.emit(EventName.EVALUATION, {
@@ -361,7 +364,7 @@ class RunManager {
   }
 
   hasAnyFailedEvaluations(): boolean {
-    return this.evaluations.some((e) => e.passed === false);
+    return this.evaluations.some((e) => e.passed === EvaluationPassed.FALSE);
   }
 
   setEndTime() {

@@ -1,6 +1,6 @@
 import { CIContext } from './ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
-import { Evaluation, TestRunStatus } from './models';
+import { Evaluation, EvaluationPassed, TestRunStatus } from './models';
 
 // Commit messages are truncated if they're longer than this
 const MAX_COMMIT_MESSAGE_LENGTH = 50;
@@ -229,13 +229,19 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
       (e) => e.evaluatorExternalId === evaluatorId,
     );
 
-    const passedCount = evaluations.filter((e) => e.passed === true).length;
-    const failedCount = evaluations.filter((e) => e.passed === false).length;
-    const nullCount = evaluations.filter((e) => e.passed === null).length;
+    const passedCount = evaluations.filter(
+      (e) => e.passed === EvaluationPassed.TRUE,
+    ).length;
+    const failedCount = evaluations.filter(
+      (e) => e.passed === EvaluationPassed.FALSE,
+    ).length;
+    const naCount = evaluations.filter(
+      (e) => e.passed === EvaluationPassed.NOT_APPLICABLE,
+    ).length;
 
     evaluatorStats[evaluatorId] = {
       // Consider N/A as passed to simplify
-      numPassedString: (passedCount + nullCount).toLocaleString(),
+      numPassedString: (passedCount + naCount).toLocaleString(),
       numFailedString: failedCount.toLocaleString(),
     };
   }

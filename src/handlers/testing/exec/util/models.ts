@@ -6,6 +6,12 @@ export enum TestRunStatus {
   NO_RESULTS = 'NO_RESULTS',
 }
 
+export enum EvaluationPassed {
+  TRUE = 'TRUE',
+  FALSE = 'FALSE',
+  NOT_APPLICABLE = 'NOT_APPLICABLE',
+}
+
 export interface TestCaseEvent {
   testExternalId: string;
   testCaseHash: string;
@@ -21,7 +27,7 @@ export const zEvaluationSchema = z.object({
   testExternalId: z.string(),
   evaluatorExternalId: z.string(),
   testCaseHash: z.string(),
-  passed: z.boolean().nullable(),
+  passed: z.nativeEnum(EvaluationPassed),
 });
 
 export type Evaluation = z.infer<typeof zEvaluationSchema>;
