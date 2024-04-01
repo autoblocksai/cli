@@ -31,7 +31,7 @@
   "dependencies": {
     "@actions/exec": "^1.1.1",
     "@actions/github": "^6.0.0",
-    "@autoblocks/client": "^0.0.37",
+    "@autoblocks/client": "^0.0.39",
     "@hono/node-server": "^1.7.0",
     "@hono/zod-validator": "^0.2.0",
     "hono": "^4.0.0",
