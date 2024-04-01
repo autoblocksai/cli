@@ -19,7 +19,7 @@ const zConsoleLogSchema = z.object({
 });
 
 const zUncaughtErrorSchema = z.object({
-  testExternalId: z.string(),
+  testExternalId: z.string().optional(),
   // Will be defined if the error occurred within a certain test case
   testCaseHash: z.string().optional(),
   // Will be defined if the error occurred within a certain evaluator
