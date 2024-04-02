@@ -91,7 +91,9 @@ class RunManager {
     });
     const data = await resp.json();
     if (!resp.ok) {
-      throw new Error(`POST ${subpath}${path} failed: ${JSON.stringify(data)}`);
+      // Our API returns errors formated at JSON, so just throw
+      // the stringified JSON
+      throw new Error(JSON.stringify(data));
     }
     return data;
   }
@@ -224,17 +226,22 @@ class RunManager {
   }
 
   handleUncaughtError(args: {
-    testExternalId: string;
-    testCaseHash?: string;
-    evaluatorExternalId?: string;
+    // Where the error originated from
+    ctx: 'cmd' | 'cli';
+    // Error
     error: {
       name: string;
       message: string;
       stacktrace: string;
     };
+    // If originated from cmd, details about
+    // which test suite, test case, and evaluator
+    testExternalId?: string;
+    testCaseHash?: string;
+    evaluatorExternalId?: string;
   }) {
     emitter.emit(EventName.CONSOLE_LOG, {
-      ctx: 'cmd',
+      ctx: args.ctx,
       level: 'error',
       message: JSON.stringify(args, null, 2),
     });
@@ -438,10 +445,13 @@ function createHonoApp(runManager: RunManager): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
-    emitter.emit(EventName.CONSOLE_LOG, {
+    runManager.handleUncaughtError({
+      error: {
+        name: 'HTTPError',
+        message: `${c.req.method} ${c.req.path}: ${err.message}`,
+        stacktrace: '',
+      },
       ctx: 'cli',
-      level: 'error',
-      message: `${c.req.method} ${c.req.path}: ${err.message}`,
     });
     return c.json('Internal Server Error', 500);
   });
@@ -543,7 +553,10 @@ function createHonoApp(runManager: RunManager): Hono {
     ),
     async (c) => {
       const data = c.req.valid('json');
-      runManager.handleUncaughtError(data);
+      runManager.handleUncaughtError({
+        ...data,
+        ctx: 'cmd',
+      });
       return c.json('ok');
     },
   );
