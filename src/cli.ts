@@ -5,7 +5,12 @@ import packageJson from '../package.json';
 import { renderOutdatedVersionComponent } from './components/outdated-version';
 import { handlers } from './handlers/index.js';
 import { AutoblocksTracer } from '@autoblocks/client';
-import { AUTOBLOCKS_WEBAPP_BASE_URL } from './util/constants';
+import {
+  AUTOBLOCKS_WEBAPP_BASE_URL,
+  AUTOBLOCKS_API_KEY_NAME,
+  AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME,
+} from './util/constants';
+import fs from 'fs';
 
 const packageName = packageJson.name;
 const packageVersion = packageJson.version;
@@ -40,12 +45,34 @@ async function latestVersionMiddleware(): Promise<void> {
   }
 }
 
+/**
+ * Read variable from process.env or from a .env file in the current working directory.
+ */
+const variableFromEnv = (variableName: string): string | undefined => {
+  const value = process.env[variableName];
+  if (value) {
+    return value;
+  }
+
+  try {
+    const envFile = fs.readFileSync('.env', 'utf-8');
+    const match = envFile.match(new RegExp(`^${variableName}=(.*)$`, 'm'));
+    if (match) {
+      return match[1];
+    }
+  } catch {
+    // Ignore
+  }
+
+  return undefined;
+};
+
 // The newline at the top of this message is intentional;
 // it gives separation between the error message shown by
 // yargs and this one.
 const apiKeyMissingErrorMessage = `
 Autoblocks API key is required.
-Provide it via the AUTOBLOCKS_API_KEY environment variable or the --api-key option.
+Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .env file, or the --api-key option.
 
 You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`;
 
@@ -56,10 +83,9 @@ const parser = yargs(hideBin(process.argv))
     (yargs) => {
       return yargs
         .option('api-key', {
-          describe:
-            'Autoblocks API key. Can be set via the AUTOBLOCKS_API_KEY environment variable.',
+          describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable.`,
           type: 'string',
-          default: process.env.AUTOBLOCKS_API_KEY,
+          default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
         })
         .option('message', {
           alias: 'm',
@@ -78,10 +104,9 @@ const parser = yargs(hideBin(process.argv))
           default: false,
         })
         .option('slack-webhook-url', {
-          describe:
-            'Slack webhook URL where results are posted. Can be set via the AUTOBLOCKS_SLACK_WEBHOOK_URL environment variable.',
+          describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable.`,
           type: 'string',
-          default: process.env.AUTOBLOCKS_SLACK_WEBHOOK_URL,
+          default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
         })
         .demandOption('api-key', apiKeyMissingErrorMessage)
         .help();
