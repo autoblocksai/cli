@@ -255,11 +255,13 @@ class RunManager {
     testCaseBody?: unknown;
     testCaseOutput?: unknown;
   }) {
-    const events = this.testCaseEvents.filter(
-      (e) =>
-        e.testExternalId === args.testExternalId &&
-        e.testCaseHash === args.testCaseHash,
-    );
+    const events = this.testCaseEvents
+      .filter(
+        (e) =>
+          e.testExternalId === args.testExternalId &&
+          e.testCaseHash === args.testCaseHash,
+      )
+      .map((e) => e.event);
     const runId = this.currentRunId({
       testExternalId: args.testExternalId,
     });
