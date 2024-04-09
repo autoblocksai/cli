@@ -5,6 +5,7 @@ import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { AUTOBLOCKS_WEBAPP_BASE_URL } from '../../../../../util/constants';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
+import type { Handler } from '../../../../../util/types';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -161,7 +162,7 @@ function TestRow(props: {
   );
 }
 
-const App = (props: { onListenersCreated: () => void }) => {
+const App = (props: { onListenersCreated: Handler }) => {
   const [testExternalIds, setTestExternalIds] = useState<string[]>([]);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
@@ -284,5 +285,5 @@ const App = (props: { onListenersCreated: () => void }) => {
   );
 };
 
-export const renderTestProgress = (args: { onListenersCreated: () => void }) =>
+export const renderTestProgress = (args: { onListenersCreated: Handler }) =>
   render(<App onListenersCreated={args.onListenersCreated} />);

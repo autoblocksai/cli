@@ -11,3 +11,5 @@ modify_package_json() {
 
 modify_package_json "ink" "build/"
 modify_package_json "ink-spinner" "build/"
+modify_package_json "ink-text-input" "build/"
+modify_package_json "ink-select-input" "build/"

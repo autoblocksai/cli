@@ -67,7 +67,7 @@ const variableFromEnv = (variableName: string): string | undefined => {
   return undefined;
 };
 
-// The newline at the top of this message is intentional;
+// The newline at the top of these messages is intentional;
 // it gives separation between the error message shown by
 // yargs and this one.
 const apiKeyMissingErrorMessage = `
@@ -76,28 +76,56 @@ Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .en
 
 You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`;
 
+const commandNotFoundErrorMessage = `
+No command found. Provide a command following '--'. For example:
+
+npx autoblocks testing exec -- echo "Hello, world!
+`;
+
+const parseCommandFromArgv = (
+  argv: yargs.Arguments,
+): { command: string; commandArgs: string[] } => {
+  const unparsed = argv['--'];
+  if (!Array.isArray(unparsed)) {
+    throw new Error(commandNotFoundErrorMessage);
+  }
+
+  const [command, ...commandArgs] = unparsed.map(String);
+
+  if (!command) {
+    throw new Error(commandNotFoundErrorMessage);
+  }
+
+  return { command, commandArgs };
+};
+
+const apiKeyOptions = {
+  describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable.`,
+  type: 'string',
+  default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
+  demandOption: apiKeyMissingErrorMessage,
+} as const;
+
+const portOptions = {
+  alias: 'p',
+  describe: 'Local CLI server port number',
+  type: 'number',
+  default: 5555,
+} as const;
+
 const parser = yargs(hideBin(process.argv))
   .command(
     'testing exec',
     'Execute a command that runs Autoblocks tests',
     (yargs) => {
       return yargs
-        .option('api-key', {
-          describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable.`,
-          type: 'string',
-          default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
-        })
+        .option('api-key', apiKeyOptions)
         .option('message', {
           alias: 'm',
           describe: 'Description for this test run',
           type: 'string',
         })
-        .option('port', {
-          alias: 'p',
-          describe: 'Local test server port number',
-          type: 'number',
-          default: 5555,
-        })
+        .option('port', portOptions)
         .option('exit-1-on-evaluation-failure', {
           describe: 'Exit with code 1 if any evaluation fails.',
           type: 'boolean',
@@ -108,25 +136,10 @@ const parser = yargs(hideBin(process.argv))
           type: 'string',
           default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
         })
-        .demandOption('api-key', apiKeyMissingErrorMessage)
         .help();
     },
     (argv) => {
-      const errorMessage = `No command found. Provide a command following '--'. For example:
-
-npx autoblocks testing exec -- echo "Hello, world!
-`;
-
-      const unparsed = argv['--'];
-      if (!Array.isArray(unparsed)) {
-        throw new Error(errorMessage);
-      }
-
-      const [command, ...commandArgs] = unparsed.map(String);
-
-      if (!command) {
-        throw new Error(errorMessage);
-      }
+      const { command, commandArgs } = parseCommandFromArgv(argv);
 
       handlers.testing.exec({
         command,
@@ -136,6 +149,32 @@ npx autoblocks testing exec -- echo "Hello, world!
         port: argv.port,
         exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
         slackWebhookUrl: argv['slack-webhook-url'],
+      });
+    },
+  )
+  .command(
+    'testing align',
+    'Align an Autoblocks test suite with human-in-the-loop feedback',
+    (yargs) => {
+      return yargs
+        .option('api-key', apiKeyOptions)
+        .option('test-suite-id', {
+          describe: 'ID of the test suite to align',
+          type: 'string',
+          demandOption: true,
+        })
+        .option('port', portOptions)
+        .help();
+    },
+    (argv) => {
+      const { command, commandArgs } = parseCommandFromArgv(argv);
+
+      handlers.testing.align({
+        command,
+        commandArgs,
+        testExternalId: argv['test-suite-id'],
+        apiKey: argv['api-key'],
+        port: argv.port,
       });
     },
   )
@@ -190,7 +229,7 @@ npx autoblocks testing exec -- echo "Hello, world!
       });
 
       // Send error to Autoblocks
-      await tracer.sendEvent('cli.error', {
+      tracer.sendEvent('cli.error', {
         properties: {
           version: packageVersion,
           error: {
