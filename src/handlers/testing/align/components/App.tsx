@@ -145,6 +145,7 @@ function App(props: AppProps) {
   };
 
   useEffect(() => {
+    // Set up listener for test case results
     const testCaseResultListener = (result: TestCaseResult) => {
       setCurrentTestCaseResult({
         isLoading: false,
@@ -160,6 +161,7 @@ function App(props: AppProps) {
     })();
 
     return () => {
+      // Clean up listener on unmount
       emitter.off(EventName.TEST_CASE_RESULT, testCaseResultListener);
     };
   }, []);
