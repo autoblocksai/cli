@@ -14,6 +14,7 @@ export async function align(args: {
 }) {
   const sessionManager = new SessionManager({
     apiKey: args.apiKey,
+    testExternalId: args.testExternalId,
   });
   await sessionManager.start();
 

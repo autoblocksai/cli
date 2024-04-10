@@ -11,6 +11,7 @@ import {
 
 export class SessionManager {
   private readonly apiKey: string;
+  private readonly testExternalId: string;
   private sessionId: string | undefined;
   private language: Language | undefined = Language.PYTHON;
   private testSuiteDirectory: string | undefined =
@@ -20,8 +21,9 @@ export class SessionManager {
   );
   private testCaseEvents: TestCaseEvent[] = [];
 
-  constructor(args: { apiKey: string }) {
+  constructor(args: { apiKey: string; testExternalId: string }) {
     this.apiKey = args.apiKey;
+    this.testExternalId = args.testExternalId;
   }
 
   async start(): Promise<void> {
@@ -59,6 +61,10 @@ export class SessionManager {
   }
 
   handleTestCaseEvent(event: TestCaseEvent) {
+    if (event.testExternalId !== this.testExternalId) {
+      throw new Error('Test external ID does not match');
+    }
+
     this.testCaseEvents.push(event);
   }
 
@@ -66,8 +72,12 @@ export class SessionManager {
     this.testCaseEvents = [];
   }
 
-  handleTestCaseResult(args: TestCaseResult): void {
-    emitter.emit(EventName.TEST_CASE_RESULT, args);
+  handleTestCaseResult(result: TestCaseResult): void {
+    if (result.testExternalId !== this.testExternalId) {
+      throw new Error('Test external ID does not match');
+    }
+
+    emitter.emit(EventName.TEST_CASE_RESULT, result);
   }
 
   async handleTestCaseResultGrade(args: GradedTestCaseResult): Promise<void> {
