@@ -7,6 +7,11 @@ import { AfterGradeAction } from '../util/models';
 import { AfterGradeSelectAction } from './AfterGradeSelectAction';
 import { Question } from './Question';
 
+enum BinaryGrade {
+  ACCEPTED = 'accepted',
+  REJECTED = 'rejected',
+}
+
 export function GradeTestCaseResultForm(props: {
   body: unknown;
   output: unknown;
@@ -14,24 +19,26 @@ export function GradeTestCaseResultForm(props: {
   onAfterGradeAction: AsyncHandlerOf<AfterGradeAction>;
   isGradingLastTestCase: boolean;
 }) {
-  const indent = 4;
   const stringifiedBody = JSON.stringify(props.body, null, 2);
   const stringifiedOutput =
     typeof props.output === 'string'
       ? props.output
       : JSON.stringify(props.output, null, 2);
-  const [accepted, setAccepted] = useState<boolean | undefined>();
+  const [grade, setGrade] = useState<BinaryGrade | undefined>();
   const [reason, setReason] = useState('');
   const [didSubmitReason, setDidSubmitReason] = useState<boolean>(false);
   const [showAfterGradeSelectAction, setShowAfterGradeSelectAction] =
     useState(false);
 
   const gradeItems = [
-    { label: '✓ This looks good', value: true },
-    { label: '✗ This is not what I was expecting', value: false },
+    { label: '✓ This looks good', value: BinaryGrade.ACCEPTED },
+    {
+      label: '✗ This is not what I was expecting',
+      value: BinaryGrade.REJECTED,
+    },
   ];
   const selectedGradeLabel = gradeItems.find(
-    (item) => item.value === accepted,
+    (item) => item.value === grade,
   )?.label;
 
   return (
@@ -54,21 +61,24 @@ export function GradeTestCaseResultForm(props: {
       </Box>
       <Box flexDirection="column">
         <Question question="What do you think of this output?" />
-        {accepted === undefined ? (
+        {grade === undefined ? (
+          // If grade hasn't been selected yet, show the grade selection menu.
           <SelectInput
             items={gradeItems}
             onSelect={({ value }) => {
-              setAccepted(value);
+              setGrade(value);
             }}
           />
         ) : (
+          // Once the grade has been selected, show the selected grade.
           <Text>{selectedGradeLabel}</Text>
         )}
       </Box>
-      {accepted !== undefined && (
+      {/* Once the grade has been selected, ask the user why they gave the output the given grade. */}
+      {grade !== undefined && (
         <Box flexDirection="column">
           <Question
-            question={accepted ? 'Why?' : 'Why not?'}
+            question={grade === BinaryGrade.ACCEPTED ? 'Why?' : 'Why not?'}
             hint="(Enter to skip)"
           />
           {didSubmitReason ? (
@@ -79,7 +89,7 @@ export function GradeTestCaseResultForm(props: {
               onChange={setReason}
               onSubmit={async () => {
                 await props.onGraded({
-                  accepted,
+                  accepted: grade === BinaryGrade.ACCEPTED,
                   // Convert empty string to undefined
                   reason: reason || undefined,
                 });
