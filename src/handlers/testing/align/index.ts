@@ -30,9 +30,7 @@ export async function align(args: {
       renderApp({
         testExternalId: args.testExternalId,
         sessionId: sessionManager.getSessionId(),
-        testCaseHashes: (): string[] => {
-          return sessionManager.getTestCaseHashes();
-        },
+        testCaseHashes: sessionManager.getTestCaseHashes(),
         requestNextTestCaseResult: async (testCaseHash: string) => {
           // Clear out any events from past test case runs
           sessionManager.resetTestCaseEvents();
