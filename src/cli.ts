@@ -114,70 +114,73 @@ const portOptions = {
 } as const;
 
 const parser = yargs(hideBin(process.argv))
-  .command(
-    'testing exec',
-    'Execute a command that runs Autoblocks tests',
-    (yargs) => {
-      return yargs
-        .option('api-key', apiKeyOptions)
-        .option('message', {
-          alias: 'm',
-          describe: 'Description for this test run',
-          type: 'string',
-        })
-        .option('port', portOptions)
-        .option('exit-1-on-evaluation-failure', {
-          describe: 'Exit with code 1 if any evaluation fails.',
-          type: 'boolean',
-          default: false,
-        })
-        .option('slack-webhook-url', {
-          describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable.`,
-          type: 'string',
-          default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
-        })
-        .help();
-    },
-    (argv) => {
-      const { command, commandArgs } = parseCommandFromArgv(argv);
+  .command('testing', 'Autoblocks Testing', (yargs) => {
+    return yargs
+      .command(
+        'exec',
+        'Execute a command that runs your Autoblocks test suites',
+        (yargs) => {
+          return yargs
+            .option('api-key', apiKeyOptions)
+            .option('message', {
+              alias: 'm',
+              describe: 'Description for this test run',
+              type: 'string',
+            })
+            .option('port', portOptions)
+            .option('exit-1-on-evaluation-failure', {
+              describe: 'Exit with code 1 if any evaluation fails.',
+              type: 'boolean',
+              default: false,
+            })
+            .option('slack-webhook-url', {
+              describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable.`,
+              type: 'string',
+              default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
+            })
+            .help();
+        },
+        (argv) => {
+          const { command, commandArgs } = parseCommandFromArgv(argv);
 
-      handlers.testing.exec({
-        command,
-        commandArgs,
-        apiKey: argv['api-key'],
-        runMessage: argv.message,
-        port: argv.port,
-        exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
-        slackWebhookUrl: argv['slack-webhook-url'],
-      });
-    },
-  )
-  .command(
-    'testing align',
-    'Align an Autoblocks test suite with human-in-the-loop feedback',
-    (yargs) => {
-      return yargs
-        .option('api-key', apiKeyOptions)
-        .option('test-suite-id', {
-          describe: 'ID of the test suite to align',
-          type: 'string',
-          demandOption: true,
-        })
-        .option('port', portOptions)
-        .help();
-    },
-    (argv) => {
-      const { command, commandArgs } = parseCommandFromArgv(argv);
+          handlers.testing.exec({
+            command,
+            commandArgs,
+            apiKey: argv['api-key'],
+            runMessage: argv.message,
+            port: argv.port,
+            exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
+            slackWebhookUrl: argv['slack-webhook-url'],
+          });
+        },
+      )
+      .command(
+        'align',
+        'Align an Autoblocks test suite with human-in-the-loop feedback',
+        (yargs) => {
+          return yargs
+            .option('api-key', apiKeyOptions)
+            .option('test-suite-id', {
+              describe: 'ID of the test suite to align',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('port', portOptions)
+            .help();
+        },
+        (argv) => {
+          const { command, commandArgs } = parseCommandFromArgv(argv);
 
-      handlers.testing.align({
-        command,
-        commandArgs,
-        testExternalId: argv['test-suite-id'],
-        apiKey: argv['api-key'],
-        port: argv.port,
-      });
-    },
-  )
+          handlers.testing.align({
+            command,
+            commandArgs,
+            testExternalId: argv['test-suite-id'],
+            apiKey: argv['api-key'],
+            port: argv.port,
+          });
+        },
+      );
+  })
   // Populates `argv['--']` with the unparsed arguments after --
   // https://github.com/yargs/yargs-parser?tab=readme-ov-file#populate---
   .parserConfiguration({
