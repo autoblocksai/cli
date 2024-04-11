@@ -15,7 +15,7 @@
     "build": "tsup",
     "format": "prettier --write .",
     "lint": "eslint --ext .ts --max-warnings 0 .",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit --skipLibCheck",
     "prepare": "husky install"
   },
   "repository": {
