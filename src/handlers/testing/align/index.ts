@@ -46,7 +46,7 @@ export async function align(args: {
           });
         },
         onTestCaseResultGraded: async (args) => {
-          await sessionManager.handleTestCaseResultGrade(args);
+          await sessionManager.handleGradedTestCaseResult(args);
         },
         autogenerateEvaluators: async () => {
           return sessionManager.autogenerateEvaluators();
