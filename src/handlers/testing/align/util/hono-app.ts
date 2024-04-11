@@ -25,7 +25,7 @@ export function createHonoApp(sessionManager: SessionManager): Hono {
       'json',
       z.object({
         language: z.nativeEnum(Language),
-        testSuiteDirectory: z.string(),
+        runTestSuiteCalledFromFilepath: z.string(),
         testCaseHashes: z.array(z.string()),
       }),
       handleValidationResult,

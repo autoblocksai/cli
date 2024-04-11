@@ -14,7 +14,7 @@ export class SessionManager {
   private readonly testExternalId: string;
   private sessionId: string | undefined;
   private language: Language | undefined = Language.PYTHON;
-  private testSuiteDirectory: string | undefined =
+  private runTestSuiteCalledFromFilepath: string | undefined =
     '/Users/nicole/autoblocks/cli';
   private testCaseHashes: string[] = Array.from({ length: 10 }, () =>
     crypto.randomUUID(),
@@ -33,11 +33,11 @@ export class SessionManager {
 
   handleInfo(args: {
     language: Language;
-    testSuiteDirectory: string;
+    runTestSuiteCalledFromFilepath: string;
     testCaseHashes: string[];
   }) {
     this.language = args.language;
-    this.testSuiteDirectory = args.testSuiteDirectory;
+    this.runTestSuiteCalledFromFilepath = args.runTestSuiteCalledFromFilepath;
     this.testCaseHashes = args.testCaseHashes;
   }
 
@@ -106,7 +106,7 @@ export class SessionManager {
     if (!this.language) {
       throw new Error('Language not set');
     }
-    if (!this.testSuiteDirectory) {
+    if (!this.runTestSuiteCalledFromFilepath) {
       throw new Error('Test suite directory not set');
     }
 
@@ -127,7 +127,7 @@ export class SessionManager {
 
     return writeEvaluatorTemplates({
       language: this.language,
-      testSuiteDirectory: this.testSuiteDirectory,
+      runTestSuiteCalledFromFilepath: this.runTestSuiteCalledFromFilepath,
       evaluators,
     });
   }
