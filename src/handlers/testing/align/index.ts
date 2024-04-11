@@ -30,6 +30,9 @@ export async function align(args: {
       renderApp({
         testExternalId: args.testExternalId,
         sessionId: sessionManager.getSessionId(),
+        // This is a function instead of a list because the hashes will change
+        // between the first run (it will be empty because we haven't received the
+        // response from /info yet) and the second run where we will have the hashes
         testCaseHashes: () => sessionManager.getTestCaseHashes(),
         requestNextTestCaseResult: async ({
           testCaseHash,
