@@ -30,8 +30,8 @@ export async function align(args: {
       renderApp({
         testExternalId: args.testExternalId,
         sessionId: sessionManager.getSessionId(),
-        testCaseHashes: sessionManager.getTestCaseHashes(),
-        requestNextTestCaseResult: async (testCaseHash: string) => {
+        testCaseHashes: () => sessionManager.getTestCaseHashes(),
+        requestNextTestCaseResult: async (testCaseHash: string | undefined) => {
           // Clear out any events from past test case runs
           sessionManager.resetTestCaseEvents();
 
@@ -45,8 +45,8 @@ export async function align(args: {
             testCaseHash,
           });
         },
-        onTestCaseResultGraded: async (args) => {
-          await sessionManager.handleGradedTestCaseResult(args);
+        onTestCaseResultGraded: async (gradedResult) => {
+          await sessionManager.handleGradedTestCaseResult(gradedResult);
         },
         autogenerateEvaluators: async () => {
           return sessionManager.autogenerateEvaluators();
