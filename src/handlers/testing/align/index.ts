@@ -3,7 +3,6 @@ import { renderApp } from './components/App';
 import { createHonoApp } from './util/hono-app';
 import { runCommandInAlignmentMode } from './util/run-command';
 import { SessionManager } from './util/session-manager';
-import { faker } from '@faker-js/faker';
 
 export async function align(args: {
   command: string;
@@ -44,21 +43,6 @@ export async function align(args: {
             cliServerAddress: serverAddress,
             testExternalId: args.testExternalId,
             testCaseHash,
-          });
-
-          // Simulate a test case result from the SDK
-          await new Promise((resolve) => setTimeout(resolve, 1_000));
-          sessionManager.handleTestCaseResult({
-            testExternalId: args.testExternalId,
-            testCaseHash,
-            testCaseBody: {
-              input: faker.lorem.sentence(),
-              expected_substrings: Array.from(
-                { length: faker.number.int({ min: 3, max: 5 }) },
-                () => faker.lorem.word(),
-              ),
-            },
-            testCaseOutput: faker.lorem.paragraphs(5, '\n\n'),
           });
         },
         onTestCaseResultGraded: async (args) => {

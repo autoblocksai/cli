@@ -13,12 +13,9 @@ export class SessionManager {
   private readonly apiKey: string;
   private readonly testExternalId: string;
   private sessionId: string | undefined;
-  private language: Language | undefined = Language.PYTHON;
-  private runTestSuiteCalledFromFilepath: string | undefined =
-    '/Users/nicole/autoblocks/cli';
-  private testCaseHashes: string[] = Array.from({ length: 10 }, () =>
-    crypto.randomUUID(),
-  );
+  private language: Language | undefined;
+  private runTestSuiteCalledFromFilepath: string | undefined;
+  private testCaseHashes: string[] = [];
   private testCaseEvents: TestCaseEvent[] = [];
 
   constructor(args: { apiKey: string; testExternalId: string }) {
