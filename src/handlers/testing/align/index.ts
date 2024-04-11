@@ -31,7 +31,11 @@ export async function align(args: {
         testExternalId: args.testExternalId,
         sessionId: sessionManager.getSessionId(),
         testCaseHashes: () => sessionManager.getTestCaseHashes(),
-        requestNextTestCaseResult: async (testCaseHash: string | undefined) => {
+        requestNextTestCaseResult: async ({
+          testCaseHash,
+        }: {
+          testCaseHash: string | undefined;
+        }) => {
           // Clear out any events from past test case runs
           sessionManager.resetTestCaseEvents();
 
