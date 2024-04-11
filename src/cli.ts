@@ -76,24 +76,25 @@ Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .en
 
 You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`;
 
-const commandNotFoundErrorMessage = `
+const makeTestingCommandNotFoundErrorMessage = (command: string) => `
 No command found. Provide a command following '--'. For example:
 
-npx autoblocks testing exec -- echo "Hello, world!
+npx autoblocks testing ${command} -- echo "Hello, world!
 `;
 
-const parseCommandFromArgv = (
-  argv: yargs.Arguments,
-): { command: string; commandArgs: string[] } => {
-  const unparsed = argv['--'];
+const parseCommandFromArgv = (args: {
+  command: string;
+  argv: yargs.Arguments;
+}): { command: string; commandArgs: string[] } => {
+  const unparsed = args.argv['--'];
   if (!Array.isArray(unparsed)) {
-    throw new Error(commandNotFoundErrorMessage);
+    throw new Error(makeTestingCommandNotFoundErrorMessage(args.command));
   }
 
   const [command, ...commandArgs] = unparsed.map(String);
 
   if (!command) {
-    throw new Error(commandNotFoundErrorMessage);
+    throw new Error(makeTestingCommandNotFoundErrorMessage(args.command));
   }
 
   return { command, commandArgs };
@@ -141,7 +142,10 @@ const parser = yargs(hideBin(process.argv))
             .help();
         },
         (argv) => {
-          const { command, commandArgs } = parseCommandFromArgv(argv);
+          const { command, commandArgs } = parseCommandFromArgv({
+            command: 'exec',
+            argv,
+          });
 
           handlers.testing.exec({
             command,
@@ -169,7 +173,10 @@ const parser = yargs(hideBin(process.argv))
             .help();
         },
         (argv) => {
-          const { command, commandArgs } = parseCommandFromArgv(argv);
+          const { command, commandArgs } = parseCommandFromArgv({
+            command: 'align',
+            argv,
+          });
 
           handlers.testing.align({
             command,
