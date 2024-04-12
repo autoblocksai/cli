@@ -2,15 +2,24 @@ import { Box, Spacer, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
-import { AUTOBLOCKS_WEBAPP_BASE_URL } from '../../../../../util/constants';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
+import {
+  makeAutoblocksCIBuildHtmlUrl,
+  makeAutoblocksTestHtmlUrl,
+} from '../../util/url';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 type Evaluation = EventSchemas[EventName.EVALUATION];
 type RunStarted = EventSchemas[EventName.RUN_STARTED];
 type RunEnded = EventSchemas[EventName.RUN_ENDED];
+
+interface AppProps {
+  onListenersCreated: () => void;
+  ciBranchId: string | undefined;
+  ciBuildId: string | undefined;
+}
 
 const MAX_TEST_CASES = 100;
 
@@ -86,6 +95,10 @@ function TestRow(props: {
   const { color: testStatusColor, icon: testStatusIcon } =
     statusToColorAndIcon[testStatus];
 
+  const autoblocksTestHtmlUrl = makeAutoblocksTestHtmlUrl({
+    testExternalId: props.testExternalId,
+  });
+
   return (
     <Box flexDirection="column">
       <Box columnGap={1}>
@@ -95,15 +108,13 @@ function TestRow(props: {
           <Spinner type="dots" />
         )}
         <Text bold={true}>{props.testExternalId}</Text>
-        {/* TODO: show URL for CI context as well */}
-        {!process.env.CI && (
-          <>
-            <Spacer />
-            <Text>
-              {`${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/local/test/${encodeURIComponent(props.testExternalId)}`}
-            </Text>
-          </>
-        )}
+        <Spacer />
+        {/* Hardcode the width so that the URL doesn't wrap. */}
+        <Box width={autoblocksTestHtmlUrl.length}>
+          <Text color="cyan" dimColor={true}>
+            {autoblocksTestHtmlUrl}
+          </Text>
+        </Box>
       </Box>
       <Box paddingLeft={2} columnGap={2}>
         {props.runIsOver && testStatus === TestRunStatus.NO_RESULTS && (
@@ -161,7 +172,7 @@ function TestRow(props: {
   );
 }
 
-const App = (props: { onListenersCreated: () => void }) => {
+const App = (props: AppProps) => {
   const [testExternalIds, setTestExternalIds] = useState<string[]>([]);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
@@ -221,6 +232,14 @@ const App = (props: { onListenersCreated: () => void }) => {
     };
   }, []);
 
+  const autoblocksCIBuildHtmlUrl =
+    props.ciBranchId && props.ciBuildId
+      ? makeAutoblocksCIBuildHtmlUrl({
+          branchId: props.ciBranchId,
+          buildId: props.ciBuildId,
+        })
+      : undefined;
+
   return (
     <>
       <Static items={consoleLogs}>
@@ -247,42 +266,56 @@ const App = (props: { onListenersCreated: () => void }) => {
         // NOTE: This margin is required to prevent the logs being shown in the <Static> component
         // above from clobbering this box
         marginTop={1}
-        paddingX={1}
+        width="100%"
         flexDirection="column"
-        borderStyle="round"
-        borderColor="gray"
-        minHeight={12}
-        rowGap={1}
       >
-        {testExternalIds.length === 0 && (
-          <Box>
-            <Text color="gray">
-              Waiting for test results
-              <Spinner type="simpleDots" />
+        {autoblocksCIBuildHtmlUrl && (
+          // Hardcode the width so that the URL doesn't wrap.
+          <Box width={`View results at ${autoblocksCIBuildHtmlUrl}`.length}>
+            <Text color="gray">View results at</Text>
+            <Space />
+            <Text color="cyan" dimColor={true}>
+              {autoblocksCIBuildHtmlUrl}
             </Text>
           </Box>
         )}
-        {testExternalIds.map((testExternalId) => {
-          const testEvals = evals.filter(
-            (e) => e.testExternalId === testExternalId,
-          );
-          const errors = uncaughtErrors.filter(
-            (e) => e.testExternalId === testExternalId,
-          );
-          return (
-            <TestRow
-              key={testExternalId}
-              runIsOver={testIdToRunIsOver[testExternalId]}
-              testExternalId={testExternalId}
-              evals={testEvals}
-              errors={errors}
-            />
-          );
-        })}
+        <Box
+          paddingX={1}
+          flexDirection="column"
+          borderStyle="round"
+          borderColor="gray"
+          minHeight={12}
+          rowGap={1}
+        >
+          {testExternalIds.length === 0 && (
+            <Box>
+              <Text color="gray">
+                Waiting for test results
+                <Spinner type="simpleDots" />
+              </Text>
+            </Box>
+          )}
+          {testExternalIds.map((testExternalId) => {
+            const testEvals = evals.filter(
+              (e) => e.testExternalId === testExternalId,
+            );
+            const testErrors = uncaughtErrors.filter(
+              (e) => e.testExternalId === testExternalId,
+            );
+            return (
+              <TestRow
+                key={testExternalId}
+                runIsOver={testIdToRunIsOver[testExternalId]}
+                testExternalId={testExternalId}
+                evals={testEvals}
+                errors={testErrors}
+              />
+            );
+          })}
+        </Box>
       </Box>
     </>
   );
 };
 
-export const renderTestProgress = (args: { onListenersCreated: () => void }) =>
-  render(<App onListenersCreated={args.onListenersCreated} />);
+export const renderTestProgress = (args: AppProps) => render(<App {...args} />);

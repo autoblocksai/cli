@@ -19,20 +19,32 @@ export async function exec(args: {
   exit1OnEvaluationFailure: boolean;
   slackWebhookUrl: string | undefined;
 }) {
-  let listenersCreated = false;
-  renderTestProgress({ onListenersCreated: () => (listenersCreated = true) });
-
-  // Wait for listeners to be created before starting the server
-  while (!listenersCreated) {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-
   const runManager = new RunManager({
     apiKey: args.apiKey,
     runMessage: args.runMessage,
   });
 
   const ciContext = await runManager.setupCIContext();
+
+  let listenersCreated = false;
+  renderTestProgress({
+    onListenersCreated: () => (listenersCreated = true),
+    ciBranchId: runManager.getCIBranchId(),
+    ciBuildId: runManager.getCIBuildId(),
+  });
+
+  // Wait for listeners to be created before starting the server
+  while (!listenersCreated) {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  if (ciContext) {
+    emitter.emit(EventName.CONSOLE_LOG, {
+      ctx: 'cli',
+      level: 'debug',
+      message: `Running in CI environment: ${JSON.stringify(ciContext, null, 2)}`,
+    });
+  }
 
   let runningServer: ServerType | undefined = undefined;
 

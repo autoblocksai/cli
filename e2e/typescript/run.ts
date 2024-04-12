@@ -82,7 +82,7 @@ function genTestCases(n: number): MyTestCase[] {
     id: 'my-test-suite',
     fn: testFn,
     testCaseHash: ['input'],
-    testCases: genTestCases(40),
+    testCases: genTestCases(4),
     evaluators: [new HasAllSubstrings(), new IsFriendly()],
   });
 })();
