@@ -119,12 +119,6 @@ export class RunManager {
       return null;
     }
 
-    emitter.emit(EventName.CONSOLE_LOG, {
-      ctx: 'cli',
-      level: 'debug',
-      message: `Running in CI environment: ${JSON.stringify(ciContext, null, 2)}`,
-    });
-
     const { id, branchId } = await this.post<{ id: string; branchId: string }>(
       '/builds',
       {
@@ -154,6 +148,14 @@ export class RunManager {
     this.ciBranchId = branchId;
 
     return ciContext;
+  }
+
+  getCIBranchId(): string | undefined {
+    return this.ciBranchId;
+  }
+
+  getCIBuildId(): string | undefined {
+    return this.ciBuildId;
   }
 
   async handleStartRun(args: { testExternalId: string }): Promise<string> {

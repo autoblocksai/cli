@@ -1,6 +1,7 @@
 import { CIContext } from './ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
 import { Evaluation, EvaluationPassed, TestRunStatus } from './models';
+import { makeAutoblocksCIBuildHtmlUrl } from './url';
 
 // Commit messages are truncated if they're longer than this
 const MAX_COMMIT_MESSAGE_LENGTH = 50;
@@ -56,7 +57,7 @@ function makeSlackMessageBlocks(args: {
             text: 'View in Autoblocks',
             emoji: true,
           },
-          url: makeLinkToBuildInAutoblocks({
+          url: makeAutoblocksCIBuildHtmlUrl({
             branchId: args.branchId,
             buildId: args.buildId,
           }),
@@ -73,13 +74,6 @@ function makeSlackMessageBlocks(args: {
       ...makeAllTestSuiteSections({ evaluations: args.evaluations }),
     ],
   };
-}
-
-function makeLinkToBuildInAutoblocks(args: {
-  branchId: string;
-  buildId: string;
-}): string {
-  return `https://app.autoblocks.ai/testing/ci?branchId=${args.branchId}&buildId=${args.buildId}`;
 }
 
 function makeDurationString(durationMs: number): string {
