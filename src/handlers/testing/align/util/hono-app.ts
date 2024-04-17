@@ -67,7 +67,7 @@ export function createHonoApp(sessionManager: SessionManager): Hono {
       z.object({
         testExternalId: z.string(),
         testCaseHash: z.string(),
-        testCaseBody: z.unknown(),
+        testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
       }),
       handleValidationResult,
