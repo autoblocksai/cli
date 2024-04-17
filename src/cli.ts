@@ -4,7 +4,7 @@ import { hideBin } from 'yargs/helpers';
 import packageJson from '../package.json';
 import { renderOutdatedVersionComponent } from './components/outdated-version';
 import { handlers } from './handlers/index.js';
-import { AutoblocksTracer } from '@autoblocks/client';
+import { AutoblocksTracer, flush } from '@autoblocks/client';
 import {
   AUTOBLOCKS_WEBAPP_BASE_URL,
   AUTOBLOCKS_API_KEY_NAME,
@@ -101,7 +101,7 @@ const parseCommandFromArgv = (args: {
 };
 
 const apiKeyOptions = {
-  describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable.`,
+  describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable`,
   type: 'string',
   default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
   demandOption: apiKeyMissingErrorMessage,
@@ -130,12 +130,12 @@ const parser = yargs(hideBin(process.argv))
             })
             .option('port', portOptions)
             .option('exit-1-on-evaluation-failure', {
-              describe: 'Exit with code 1 if any evaluation fails.',
+              describe: 'Exit with code 1 if any evaluation fails',
               type: 'boolean',
               default: false,
             })
             .option('slack-webhook-url', {
-              describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable.`,
+              describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable`,
               type: 'string',
               default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
             })
@@ -254,6 +254,7 @@ const parser = yargs(hideBin(process.argv))
       // Ignore
     }
 
+    await flush();
     process.exit(1);
   }
 })();
