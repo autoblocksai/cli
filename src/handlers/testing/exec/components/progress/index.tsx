@@ -7,7 +7,7 @@ import { EvaluationPassed, TestRunStatus } from '../../util/models';
 import type { Handler } from '../../../../../util/types';
 import {
   makeAutoblocksCIBuildHtmlUrl,
-  makeAutoblocksTestHtmlUrl,
+  makeAutoblocksLocalTestHtmlUrl,
 } from '../../util/url';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
@@ -96,10 +96,6 @@ function TestRow(props: {
   const { color: testStatusColor, icon: testStatusIcon } =
     statusToColorAndIcon[testStatus];
 
-  const autoblocksTestHtmlUrl = makeAutoblocksTestHtmlUrl({
-    testExternalId: props.testExternalId,
-  });
-
   return (
     <Box flexDirection="column">
       <Box columnGap={1}>
@@ -109,13 +105,23 @@ function TestRow(props: {
           <Spinner type="dots" />
         )}
         <Text bold={true}>{props.testExternalId}</Text>
-        <Spacer />
-        {/* Hardcode the width so that the URL doesn't wrap. */}
-        <Box width={autoblocksTestHtmlUrl.length}>
-          <Text color="cyan" dimColor={true}>
-            {autoblocksTestHtmlUrl}
-          </Text>
-        </Box>
+        {/* 
+          GitHub Actions does not respect width=100%, so URLs here typically end up wrapping and breaking the box's border.
+          For CI builds we show a link to the summary page above the box, which should be sufficient for navigating to
+          the test results.
+         */}
+        {!process.env.CI && (
+          <>
+            <Spacer />
+            <Box>
+              <Text color="cyan" dimColor={true}>
+                {makeAutoblocksLocalTestHtmlUrl({
+                  testExternalId: props.testExternalId,
+                })}
+              </Text>
+            </Box>
+          </>
+        )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
         {props.runIsOver && testStatus === TestRunStatus.NO_RESULTS && (
