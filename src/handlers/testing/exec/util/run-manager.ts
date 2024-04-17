@@ -1,7 +1,11 @@
 import { AUTOBLOCKS_API_BASE_URL } from '../../../../util/constants';
 import { CIContext, makeCIContext } from './ci';
 import { EventSchemas, EventName, emitter } from './emitter';
-import { TestCaseEvent, Evaluation, EvaluationPassed } from './models';
+import {
+  type TestCaseEvent,
+  type Evaluation,
+  EvaluationPassed,
+} from './models';
 import { postSlackMessage } from './slack';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -205,16 +209,7 @@ export class RunManager {
     return runId;
   }
 
-  handleTestCaseEvent(event: {
-    testExternalId: string;
-    testCaseHash: string;
-    event: {
-      message: string;
-      traceId: string;
-      timestamp: string;
-      properties?: unknown;
-    };
-  }) {
+  handleTestCaseEvent(event: TestCaseEvent) {
     this.testCaseEvents.push(event);
   }
 

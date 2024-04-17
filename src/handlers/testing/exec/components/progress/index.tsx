@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
+import type { Handler } from '../../../../../util/types';
 import {
   makeAutoblocksCIBuildHtmlUrl,
   makeAutoblocksLocalTestHtmlUrl,

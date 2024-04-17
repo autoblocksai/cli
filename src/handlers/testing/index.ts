@@ -1,3 +1,4 @@
 import { exec } from './exec';
+import { align } from './align';
 
-export { exec };
+export { exec, align };

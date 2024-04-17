@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { z } from 'zod';
 import { zEvaluationSchema } from './models';
+import type { HandlerOf } from '../../../../util/types';
 
 // Enum for event names
 export enum EventName {
@@ -50,8 +51,6 @@ const eventSchemas = {
 export type EventSchemas = {
   [K in EventName]: z.infer<(typeof eventSchemas)[K]>;
 };
-
-type HandlerOf<T> = (val: T) => void;
 
 class TypedEventEmitter {
   private readonly emitter: EventEmitter;

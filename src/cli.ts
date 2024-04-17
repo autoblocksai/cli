@@ -4,7 +4,7 @@ import { hideBin } from 'yargs/helpers';
 import packageJson from '../package.json';
 import { renderOutdatedVersionComponent } from './components/outdated-version';
 import { handlers } from './handlers/index.js';
-import { AutoblocksTracer } from '@autoblocks/client';
+import { AutoblocksTracer, flush } from '@autoblocks/client';
 import {
   AUTOBLOCKS_WEBAPP_BASE_URL,
   AUTOBLOCKS_API_KEY_NAME,
@@ -67,7 +67,7 @@ const variableFromEnv = (variableName: string): string | undefined => {
   return undefined;
 };
 
-// The newline at the top of this message is intentional;
+// The newline at the top of these messages is intentional;
 // it gives separation between the error message shown by
 // yargs and this one.
 const apiKeyMissingErrorMessage = `
@@ -76,69 +76,118 @@ Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .en
 
 You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`;
 
-const parser = yargs(hideBin(process.argv))
-  .command(
-    'testing exec',
-    'Execute a command that runs Autoblocks tests',
-    (yargs) => {
-      return yargs
-        .option('api-key', {
-          describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable.`,
-          type: 'string',
-          default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
-        })
-        .option('message', {
-          alias: 'm',
-          describe: 'Description for this test run',
-          type: 'string',
-        })
-        .option('port', {
-          alias: 'p',
-          describe: 'Local test server port number',
-          type: 'number',
-          default: 5555,
-        })
-        .option('exit-1-on-evaluation-failure', {
-          describe: 'Exit with code 1 if any evaluation fails.',
-          type: 'boolean',
-          default: false,
-        })
-        .option('slack-webhook-url', {
-          describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable.`,
-          type: 'string',
-          default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
-        })
-        .demandOption('api-key', apiKeyMissingErrorMessage)
-        .help();
-    },
-    (argv) => {
-      const errorMessage = `No command found. Provide a command following '--'. For example:
+const makeTestingCommandNotFoundErrorMessage = (command: string) => `
+No command found. Provide a command following '--'. For example:
 
-npx autoblocks testing exec -- echo "Hello, world!
+npx autoblocks testing ${command} -- echo "Hello, world!
 `;
 
-      const unparsed = argv['--'];
-      if (!Array.isArray(unparsed)) {
-        throw new Error(errorMessage);
-      }
+const parseCommandFromArgv = (args: {
+  command: string;
+  argv: yargs.Arguments;
+}): { command: string; commandArgs: string[] } => {
+  const unparsed = args.argv['--'];
+  if (!Array.isArray(unparsed)) {
+    throw new Error(makeTestingCommandNotFoundErrorMessage(args.command));
+  }
 
-      const [command, ...commandArgs] = unparsed.map(String);
+  const [command, ...commandArgs] = unparsed.map(String);
 
-      if (!command) {
-        throw new Error(errorMessage);
-      }
+  if (!command) {
+    throw new Error(makeTestingCommandNotFoundErrorMessage(args.command));
+  }
 
-      handlers.testing.exec({
-        command,
-        commandArgs,
-        apiKey: argv['api-key'],
-        runMessage: argv.message,
-        port: argv.port,
-        exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
-        slackWebhookUrl: argv['slack-webhook-url'],
-      });
-    },
-  )
+  return { command, commandArgs };
+};
+
+const apiKeyOptions = {
+  describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable`,
+  type: 'string',
+  default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
+  demandOption: apiKeyMissingErrorMessage,
+} as const;
+
+const portOptions = {
+  alias: 'p',
+  describe: 'Local CLI server port number',
+  type: 'number',
+  default: 5555,
+} as const;
+
+const parser = yargs(hideBin(process.argv))
+  .command('testing', 'Autoblocks Testing', (yargs) => {
+    return yargs
+      .command(
+        'exec',
+        'Execute a command that runs your Autoblocks test suites',
+        (yargs) => {
+          return yargs
+            .option('api-key', apiKeyOptions)
+            .option('message', {
+              alias: 'm',
+              describe: 'Description for this test run',
+              type: 'string',
+            })
+            .option('port', portOptions)
+            .option('exit-1-on-evaluation-failure', {
+              describe: 'Exit with code 1 if any evaluation fails',
+              type: 'boolean',
+              default: false,
+            })
+            .option('slack-webhook-url', {
+              describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable`,
+              type: 'string',
+              default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
+            })
+            .help();
+        },
+        (argv) => {
+          const { command, commandArgs } = parseCommandFromArgv({
+            command: 'exec',
+            argv,
+          });
+
+          handlers.testing.exec({
+            command,
+            commandArgs,
+            apiKey: argv['api-key'],
+            runMessage: argv.message,
+            port: argv.port,
+            exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
+            slackWebhookUrl: argv['slack-webhook-url'],
+          });
+        },
+      )
+      .command(
+        'align',
+        'Align an Autoblocks test suite with human-in-the-loop feedback',
+        (yargs) => {
+          return yargs
+            .option('api-key', apiKeyOptions)
+            .option('test-suite-id', {
+              describe: 'ID of the test suite to align',
+              type: 'string',
+              demandOption: true,
+            })
+            .option('port', portOptions)
+            .help();
+        },
+        (argv) => {
+          const { command, commandArgs } = parseCommandFromArgv({
+            command: 'align',
+            argv,
+          });
+
+          handlers.testing.align({
+            command,
+            commandArgs,
+            testExternalId: argv['test-suite-id'],
+            apiKey: argv['api-key'],
+            port: argv.port,
+          });
+        },
+      );
+  })
   // Populates `argv['--']` with the unparsed arguments after --
   // https://github.com/yargs/yargs-parser?tab=readme-ov-file#populate---
   .parserConfiguration({
@@ -190,7 +239,7 @@ npx autoblocks testing exec -- echo "Hello, world!
       });
 
       // Send error to Autoblocks
-      await tracer.sendEvent('cli.error', {
+      tracer.sendEvent('cli.error', {
         properties: {
           version: packageVersion,
           error: {
@@ -205,6 +254,7 @@ npx autoblocks testing exec -- echo "Hello, world!
       // Ignore
     }
 
+    await flush();
     process.exit(1);
   }
 })();
