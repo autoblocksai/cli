@@ -7,9 +7,8 @@ export function makeAutoblocksCIBuildHtmlUrl(args: {
   return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/ci?branchId=${args.branchId}&buildId=${args.buildId}`;
 }
 
-export function makeAutoblocksTestHtmlUrl(args: {
+export function makeAutoblocksLocalTestHtmlUrl(args: {
   testExternalId: string;
 }): string {
-  const subpath = process.env.CI ? 'ci' : 'local';
-  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/${subpath}/test/${encodeURIComponent(args.testExternalId)}`;
+  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/local/test/${encodeURIComponent(args.testExternalId)}`;
 }
