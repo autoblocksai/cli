@@ -13,7 +13,7 @@ enum BinaryGrade {
 }
 
 export function GradeTestCaseResultForm(props: {
-  body: unknown;
+  body: Record<string, unknown>;
   output: unknown;
   onGraded: AsyncHandlerOf<{ accepted: boolean; reason: string | undefined }>;
   onAfterGradeAction: AsyncHandlerOf<AfterGradeAction>;
