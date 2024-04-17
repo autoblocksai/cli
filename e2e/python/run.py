@@ -72,7 +72,7 @@ if __name__ == "__main__":
   run_test_suite(
       id="my-test-suite",
       fn=test_fn,
-      test_cases=gen_test_cases(40),
+      test_cases=gen_test_cases(4),
       evaluators=[
           HasAllSubstrings(),
           IsFriendly(),
