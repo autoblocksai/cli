@@ -16,7 +16,7 @@ export class SessionManager {
   private readonly testExternalId: string;
   private sessionId: string | undefined;
   private language: Language | undefined;
-  private runTestSuiteCalledFromFilepath: string | undefined;
+  private runTestSuiteCalledFromDirectory: string | undefined;
   private testCaseHashes: string[] = [];
   private testCaseEvents: TestCaseEvent[] = [];
 
@@ -63,11 +63,11 @@ export class SessionManager {
 
   handleInfo(args: {
     language: Language;
-    runTestSuiteCalledFromFilepath: string;
+    runTestSuiteCalledFromDirectory: string;
     testCaseHashes: string[];
   }) {
     this.language = args.language;
-    this.runTestSuiteCalledFromFilepath = args.runTestSuiteCalledFromFilepath;
+    this.runTestSuiteCalledFromDirectory = args.runTestSuiteCalledFromDirectory;
     this.testCaseHashes = args.testCaseHashes;
   }
 
@@ -148,7 +148,7 @@ export class SessionManager {
     if (!this.language) {
       throw new Error('Language not set');
     }
-    if (!this.runTestSuiteCalledFromFilepath) {
+    if (!this.runTestSuiteCalledFromDirectory) {
       throw new Error('Test suite directory not set');
     }
 
@@ -160,7 +160,7 @@ export class SessionManager {
 
     return writeEvaluatorTemplates({
       language: this.language,
-      runTestSuiteCalledFromFilepath: this.runTestSuiteCalledFromFilepath,
+      runTestSuiteCalledFromDirectory: this.runTestSuiteCalledFromDirectory,
       evaluators,
     });
   }
