@@ -139,6 +139,12 @@ const parser = yargs(hideBin(process.argv))
               type: 'string',
               default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
             })
+            .option('shared', {
+              describe:
+                'Output a shareable url for this test run. Ignored when running on CI.',
+              type: 'boolean',
+              default: false,
+            })
             .help();
         },
         (argv) => {
@@ -155,6 +161,7 @@ const parser = yargs(hideBin(process.argv))
             port: argv.port,
             exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],
             slackWebhookUrl: argv['slack-webhook-url'],
+            includeShareUrl: Boolean(argv['shared']),
           });
         },
       )

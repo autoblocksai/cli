@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
-import type { Handler } from '../../../../../util/types';
 import {
   makeAutoblocksCIBuildHtmlUrl,
   makeAutoblocksLocalTestHtmlUrl,
@@ -75,6 +74,7 @@ function makeColorFromLogLevel(
 
 function TestRow(props: {
   runIsOver: boolean;
+  shareUrl?: string;
   testExternalId: string;
   evals: Evaluation[];
   errors: UncaughtError[];
@@ -175,6 +175,14 @@ function TestRow(props: {
           })}
         </Box>
       </Box>
+      {props.shareUrl && (
+        <Box paddingLeft={2} paddingTop={1}>
+          <Text>Shareable Url: </Text>
+          <Text color="cyan" dimColor={true}>
+            {props.shareUrl}
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -185,7 +193,13 @@ const App = (props: AppProps) => {
   const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
   const [evals, setEvals] = useState<Evaluation[]>([]);
   const [testIdToRunIsOver, setTestIdToRunIsOver] = useState<
-    Record<string, boolean>
+    Record<
+      string,
+      {
+        ended: boolean;
+        shareUrl: string | undefined;
+      }
+    >
   >({});
 
   useEffect(() => {
@@ -218,7 +232,13 @@ const App = (props: AppProps) => {
 
     const runEndListener = (runEnded: RunEnded) => {
       setTestIdToRunIsOver((prevRunIsOver) => {
-        return { ...prevRunIsOver, [runEnded.testExternalId]: true };
+        return {
+          ...prevRunIsOver,
+          [runEnded.testExternalId]: {
+            ended: true,
+            shareUrl: runEnded.shareUrl,
+          },
+        };
       });
     };
 
@@ -312,7 +332,8 @@ const App = (props: AppProps) => {
             return (
               <TestRow
                 key={testExternalId}
-                runIsOver={testIdToRunIsOver[testExternalId]}
+                runIsOver={Boolean(testIdToRunIsOver[testExternalId]?.ended)}
+                shareUrl={testIdToRunIsOver[testExternalId]?.shareUrl}
                 testExternalId={testExternalId}
                 evals={testEvals}
                 errors={testErrors}
