@@ -275,28 +275,46 @@ export class RunManager {
     testCaseHash?: string;
     evaluatorExternalId?: string;
   }) {
-    const errorPayload = {
-      testExternalId: args.testExternalId,
-      testCaseHash: args.testCaseHash,
-      evaluatorExternalId: args.evaluatorExternalId,
-      runId: args.testExternalId
-        ? this.currentRunId({
+    const debugLines: string[] = [];
+
+    if (args.testExternalId) {
+      debugLines.push(`Test ID: ${args.testExternalId}`);
+      debugLines.push(
+        `Run ID: ${this.currentRunId({ testExternalId: args.testExternalId })}`,
+      );
+    }
+    if (args.testCaseHash) {
+      debugLines.push(`Test Case Hash: ${args.testCaseHash}`);
+      if (args.testExternalId) {
+        debugLines.push(
+          `Test Case Result ID: ${this.testCaseResultIdFromHash({
             testExternalId: args.testExternalId,
-          })
-        : undefined,
-      testCaseResultId:
-        args.testExternalId && args.testCaseHash
-          ? this.testCaseResultIdFromHash({
-              testExternalId: args.testExternalId,
-              testCaseHash: args.testCaseHash,
-            })
-          : undefined,
-      error: args.error,
-    };
+            testCaseHash: args.testCaseHash,
+          })}`,
+        );
+      }
+    }
+    if (args.evaluatorExternalId) {
+      debugLines.push(`Evaluator ID: ${args.evaluatorExternalId}`);
+    }
+
+    const msg: string[] = [`${args.error.name}: ${args.error.message}`];
+    if (debugLines.length > 0) {
+      msg.push('');
+      msg.push('======= DEBUG INFO =======');
+      msg.push(...debugLines);
+    }
+
+    if (args.error.stacktrace) {
+      msg.push('');
+      msg.push('======= STACKTRACE =======');
+      msg.push(args.error.stacktrace);
+    }
+
     emitter.emit(EventName.CONSOLE_LOG, {
       ctx: args.ctx,
       level: 'error',
-      message: JSON.stringify(errorPayload, null, 2),
+      message: msg.join('\n'),
     });
     emitter.emit(EventName.UNCAUGHT_ERROR, args);
     this.uncaughtErrors.push(args);

@@ -14,8 +14,8 @@ export function createHonoApp(runManager: RunManager): Hono {
     runManager.handleUncaughtError({
       error: {
         name: 'HTTPError',
-        message: `${c.req.method} ${c.req.path}: ${err.message}`,
-        stacktrace: '',
+        message: `${c.req.method} ${c.req.path}`,
+        stacktrace: err.stack ?? err.message,
       },
       ctx: 'cli',
     });
