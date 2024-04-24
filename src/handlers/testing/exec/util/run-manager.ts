@@ -221,6 +221,20 @@ export class RunManager {
     return runId;
   }
 
+  private testCaseResultIdFromHash(args: {
+    testExternalId: string;
+    testCaseHash: string;
+  }): string {
+    const testCaseResultId =
+      this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
+    if (!testCaseResultId) {
+      throw new Error(
+        `No corresponding test case result ID for test case hash ${args.testCaseHash}`,
+      );
+    }
+    return testCaseResultId;
+  }
+
   private async createShareUrl(args: { testExternalId: string }) {
     // Share URL is only applicable for local runs
     // CI runs are always shareable
@@ -261,10 +275,28 @@ export class RunManager {
     testCaseHash?: string;
     evaluatorExternalId?: string;
   }) {
+    const errorPayload = {
+      testExternalId: args.testExternalId,
+      testCaseHash: args.testCaseHash,
+      evaluatorExternalId: args.evaluatorExternalId,
+      runId: args.testExternalId
+        ? this.currentRunId({
+            testExternalId: args.testExternalId,
+          })
+        : undefined,
+      testCaseResultId:
+        args.testExternalId && args.testCaseHash
+          ? this.testCaseResultIdFromHash({
+              testExternalId: args.testExternalId,
+              testCaseHash: args.testCaseHash,
+            })
+          : undefined,
+      error: args.error,
+    };
     emitter.emit(EventName.CONSOLE_LOG, {
       ctx: args.ctx,
       level: 'error',
-      message: JSON.stringify(args, null, 2),
+      message: JSON.stringify(errorPayload, null, 2),
     });
     emitter.emit(EventName.UNCAUGHT_ERROR, args);
     this.uncaughtErrors.push(args);
@@ -360,14 +392,10 @@ export class RunManager {
       passed,
     });
 
-    const testCaseResultId =
-      this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
-
-    if (!testCaseResultId) {
-      throw new Error(
-        `No corresponding test case result ID for test case hash ${args.testCaseHash}`,
-      );
-    }
+    const testCaseResultId = this.testCaseResultIdFromHash({
+      testExternalId: args.testExternalId,
+      testCaseHash: args.testCaseHash,
+    });
 
     const runId = this.currentRunId({
       testExternalId: args.testExternalId,
