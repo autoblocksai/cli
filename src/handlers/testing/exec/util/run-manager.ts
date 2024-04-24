@@ -16,7 +16,7 @@ type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 export class RunManager {
   private readonly apiKey: string;
   private readonly message: string | undefined;
-
+  private readonly includeShareUrl: boolean;
   private readonly startTime: Date;
   private endTime: Date | undefined = undefined;
 
@@ -62,9 +62,14 @@ export class RunManager {
   private ciBuildId: string | undefined;
   private ciBranchId: string | undefined;
 
-  constructor(args: { apiKey: string; runMessage: string | undefined }) {
+  constructor(args: {
+    apiKey: string;
+    runMessage: string | undefined;
+    includeShareUrl: boolean;
+  }) {
     this.apiKey = args.apiKey;
     this.message = args.runMessage;
+    this.includeShareUrl = args.includeShareUrl;
     this.startTime = new Date();
 
     this.testExternalIdToRunId = {};
@@ -176,7 +181,14 @@ export class RunManager {
   }
 
   async handleEndRun(args: { testExternalId: string }): Promise<void> {
-    emitter.emit(EventName.RUN_ENDED, { testExternalId: args.testExternalId });
+    const shareUrl = await this.createShareUrl({
+      testExternalId: args.testExternalId,
+    });
+
+    emitter.emit(EventName.RUN_ENDED, {
+      testExternalId: args.testExternalId,
+      shareUrl,
+    });
 
     try {
       const runId = this.currentRunId({ testExternalId: args.testExternalId });
@@ -207,6 +219,27 @@ export class RunManager {
       );
     }
     return runId;
+  }
+
+  private async createShareUrl(args: { testExternalId: string }) {
+    // Share URL is only applicable for local runs
+    // CI runs are always shareable
+    if (this.isCI || !this.includeShareUrl) {
+      return;
+    }
+    try {
+      const runId = this.currentRunId({ testExternalId: args.testExternalId });
+      const { shareUrl } = await this.post<{ shareUrl: string }>(
+        `/runs/${runId}/share-url`,
+      );
+      return shareUrl;
+    } catch (err) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'error',
+        message: `Failed to create share URL: ${err}`,
+      });
+    }
   }
 
   handleTestCaseEvent(event: TestCaseEvent) {

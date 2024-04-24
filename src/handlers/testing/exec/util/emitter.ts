@@ -38,6 +38,7 @@ const zRunStartedSchema = z.object({
 
 const zRunEndedSchema = z.object({
   testExternalId: z.string(),
+  shareUrl: z.string().optional(),
 });
 
 const eventSchemas = {

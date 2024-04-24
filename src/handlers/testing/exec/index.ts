@@ -18,10 +18,12 @@ export async function exec(args: {
   port: number;
   exit1OnEvaluationFailure: boolean;
   slackWebhookUrl: string | undefined;
+  includeShareUrl: boolean;
 }) {
   const runManager = new RunManager({
     apiKey: args.apiKey,
     runMessage: args.runMessage,
+    includeShareUrl: args.includeShareUrl,
   });
 
   const ciContext = await runManager.setupCIContext();
