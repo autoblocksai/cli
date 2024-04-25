@@ -61,7 +61,7 @@ jobs:
         working-directory: e2e/python
         env:
           PYTHONPATH: ${{ github.workspace }}/e2e/python
-          FORCE_COLOR: 2
+          FORCE_COLOR: 3
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
@@ -107,7 +107,7 @@ jobs:
         run: ../../bin/cli.js testing exec -- npx tsx run.ts
         working-directory: e2e/typescript
         env:
-          FORCE_COLOR: 2
+          FORCE_COLOR: 3
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
