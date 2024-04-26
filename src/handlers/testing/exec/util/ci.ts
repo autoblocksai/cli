@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { getExecOutput } from '@actions/exec';
 import github from '@actions/github';
 import fs from 'fs/promises';
 
@@ -43,16 +42,6 @@ const zGitHubEnvSchema = z.object({
   GITHUB_RUN_NUMBER: z.string(),
 });
 
-const zCommitSchema = z.object({
-  sha: z.string(),
-  message: z.string(),
-  authorName: z.string(),
-  authorEmail: z.string(),
-  committerName: z.string(),
-  committerEmail: z.string(),
-  committedDate: z.string(),
-});
-
 const zPullRequestSchema = z.object({
   number: z.number(),
   title: z.string(),
@@ -72,7 +61,6 @@ const zAutoblocksOverridesSchema = z.object({
   promptRevisions: z.record(z.string(), z.string()),
 });
 
-type Commit = z.infer<typeof zCommitSchema>;
 type PullRequest = z.infer<typeof zPullRequestSchema>;
 type Repository = z.infer<typeof zRepositorySchema>;
 type AutoblocksOverrides = z.infer<typeof zAutoblocksOverridesSchema>;
@@ -112,55 +100,6 @@ function autoblocksOverridesFromEvent(event: {
   return zAutoblocksOverridesSchema.parse(JSON.parse(`${overridesRaw}`));
 }
 
-async function parseCommitFromGitLog(sha: string): Promise<Commit> {
-  const commitMessageKey = 'message';
-
-  const logFormat = [
-    'sha=%H',
-    'authorName=%an',
-    'authorEmail=%ae',
-    'committerName=%cn',
-    'committerEmail=%ce',
-    'committedDate=%aI',
-    // This should be last because it can contain multiple lines
-    `${commitMessageKey}=%B`,
-  ].join('%n');
-
-  const { stdout } = await getExecOutput(
-    'git',
-    ['show', sha, '--quiet', `--format=${logFormat}`],
-    {
-      silent: true,
-    },
-  );
-  const lines = stdout.split('\n');
-
-  const data: Record<string, string> = {};
-
-  while (lines.length) {
-    const line = lines.shift();
-    if (!line) {
-      break;
-    }
-
-    // Split on the first =
-    const idx = line.indexOf('=');
-    const [key, value] = [line.slice(0, idx), line.slice(idx + 1)];
-
-    if (key === commitMessageKey) {
-      // Once we've reached the commit message key, the remaining lines are the commit message.
-      // We only keep the first line of the commit message, though, since some commit
-      // messages can be very long.
-      data[commitMessageKey] = value;
-      break;
-    }
-
-    data[key] = value;
-  }
-
-  return zCommitSchema.parse(data);
-}
-
 export async function makeCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
   const api = github.getOctokit(env.GITHUB_TOKEN);
@@ -178,7 +117,14 @@ export async function makeCIContext(): Promise<CIContext> {
   // The GITHUB_SHA env var for pull request events is the last merge commit
   // on GITHUB_REF, but we want the commit sha of the head commit of the PR.
   const commitSha = pullRequest?.head.sha || env.GITHUB_SHA;
-  const commit = await parseCommitFromGitLog(commitSha);
+
+  // Get the commit via REST API since for pull requests the commit data
+  // is for the last merge commit and not the head commit.
+  const { data: commit } = await api.rest.git.getCommit({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    commit_sha: commitSha,
+  });
 
   // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
   // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
@@ -215,11 +161,11 @@ export async function makeCIContext(): Promise<CIContext> {
     workflowRunNumber: env.GITHUB_RUN_NUMBER,
     commitSha: commit.sha,
     commitMessage: commit.message,
-    commitCommitterName: commit.committerName,
-    commitCommitterEmail: commit.committerEmail,
-    commitAuthorName: commit.authorName,
-    commitAuthorEmail: commit.authorEmail,
-    commitCommittedDate: commit.committedDate,
+    commitCommitterName: commit.committer.name,
+    commitCommitterEmail: commit.committer.email,
+    commitAuthorName: commit.author.name,
+    commitAuthorEmail: commit.author.email,
+    commitCommittedDate: commit.author.date,
     pullRequestNumber: pullRequest?.number ?? null,
     pullRequestTitle: pullRequest?.title || null,
     autoblocksOverrides: autoblocksOverrides,
