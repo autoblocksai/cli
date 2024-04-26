@@ -175,8 +175,8 @@ export async function makeCIContext(): Promise<CIContext> {
   const pullRequest = pullRequestFromEvent(event);
   const autoblocksOverrides = autoblocksOverridesFromEvent(event);
 
-  // The commit sha for pull request events is the last merge commit
-  // but we want the commit sha of the head commit
+  // The GITHUB_SHA env var for pull request events is the last merge commit
+  // on GITHUB_REF, but we want the commit sha of the head commit of the PR.
   const commitSha = pullRequest?.head.sha || env.GITHUB_SHA;
   const commit = await parseCommitFromGitLog(commitSha);
 
