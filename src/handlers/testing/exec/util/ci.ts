@@ -24,9 +24,9 @@ export interface CIContext {
   commitCommittedDate: string;
   pullRequestNumber: number | null;
   pullRequestTitle: string | null;
-  // The prompt snapshot(s) that triggered this test run, if any.
+  // The Autoblocks overrides that triggered this test run, if any.
   // This is parsed from the GitHub Actions workflow inputs.
-  promptSnapshots: PromptSnapshots | null;
+  autoblocksOverrides: AutoblocksOverrides | null;
 }
 
 const zGitHubEnvSchema = z.object({
@@ -66,13 +66,15 @@ const zRepositorySchema = z.object({
   default_branch: z.string(),
 });
 
-// Map of prompt external ID to a snapshot ID
-const zPromptSnapshotsSchema = z.record(z.string(), z.string());
+const zAutoblocksOverridesSchema = z.object({
+  // Map of prompt external ID to a prompt revision ID
+  promptRevisions: z.record(z.string(), z.string()),
+});
 
 type Commit = z.infer<typeof zCommitSchema>;
 type PullRequest = z.infer<typeof zPullRequestSchema>;
 type Repository = z.infer<typeof zRepositorySchema>;
-type PromptSnapshots = z.infer<typeof zPromptSnapshotsSchema>;
+type AutoblocksOverrides = z.infer<typeof zAutoblocksOverridesSchema>;
 
 function pullRequestFromEvent(event: {
   pull_request?: unknown;
@@ -90,23 +92,23 @@ function repositoryFromEvent(event: { repository?: unknown }): Repository {
 
 /**
  * For users with UI-triggered test runs configured, they'll
- * have their GitHub Actions workflow set up to receive the
- * prompt snapshots as an input. This function is used to
+ * have their GitHub Actions workflow set up to receive Autoblocks
+ * overrides serialized as a string input. This function is used to
  * parse that input out of the event.json file, which will
  * contain the workflow event payload.
  */
-function promptSnapshotsFromEvent(event: {
+function autoblocksOverridesFromEvent(event: {
   inputs?: Record<string, unknown>;
-}): PromptSnapshots | null {
-  const promptSnapshotsRaw = event.inputs?.['autoblocks-prompt-snapshots'];
-  if (!promptSnapshotsRaw) {
+}): AutoblocksOverrides | null {
+  const overridesRaw = event.inputs?.['autoblocks-overrides'];
+  if (!overridesRaw) {
     return null;
   }
 
-  // This will throw if autoblocks-prompt-snapshots is not valid, but that is
-  // desired because we want to stop the workflow if the input is
-  // not what we expect.
-  return zPromptSnapshotsSchema.parse(JSON.parse(`${promptSnapshotsRaw}`));
+  // This will throw if autoblocks-overrides is not valid, but that is
+  // desired because we want to stop the workflow if the input is defined
+  // but not what we expect.
+  return zAutoblocksOverridesSchema.parse(JSON.parse(`${overridesRaw}`));
 }
 
 async function parseCommitFromGitLog(sha: string): Promise<Commit> {
@@ -171,7 +173,7 @@ export async function makeCIContext(): Promise<CIContext> {
 
   const repository = repositoryFromEvent(event);
   const pullRequest = pullRequestFromEvent(event);
-  const promptSnapshots = promptSnapshotsFromEvent(event);
+  const autoblocksOverrides = autoblocksOverridesFromEvent(event);
 
   // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
   // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
@@ -215,6 +217,6 @@ export async function makeCIContext(): Promise<CIContext> {
     commitCommittedDate: commit.committedDate,
     pullRequestNumber: pullRequest?.number ?? null,
     pullRequestTitle: pullRequest?.title || null,
-    promptSnapshots,
+    autoblocksOverrides: autoblocksOverrides,
   };
 }

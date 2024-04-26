@@ -7,9 +7,9 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      autoblocks-prompt-snapshots:
+      autoblocks-overrides:
         type: string
-        description: The prompt snapshot(s) that triggered this workflow
+        description: Overrides for Autoblocks-managed entities
         required: false
   schedule:
     - cron: '17 15 * * *'
