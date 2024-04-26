@@ -115,7 +115,7 @@ export async function exec(args: {
       if (ciContext?.autoblocksOverrides?.promptRevisions) {
         // The prompt SDKs will use this environment variable to know that they
         // need to pull down and use prompt snapshot(s)
-        commandEnv.AUTOBLOCKS_PROMPT_SNAPSHOTS = JSON.stringify(
+        commandEnv.AUTOBLOCKS_PROMPT_REVISIONS = JSON.stringify(
           ciContext.autoblocksOverrides.promptRevisions,
         );
       }
