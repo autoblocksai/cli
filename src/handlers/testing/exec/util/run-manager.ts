@@ -279,19 +279,27 @@ export class RunManager {
 
     if (args.testExternalId) {
       debugLines.push(`Test ID: ${args.testExternalId}`);
-      debugLines.push(
-        `Run ID: ${this.currentRunId({ testExternalId: args.testExternalId })}`,
-      );
+      try {
+        debugLines.push(
+          `Run ID: ${this.currentRunId({ testExternalId: args.testExternalId })}`,
+        );
+      } catch {
+        // Ignore
+      }
     }
     if (args.testCaseHash) {
       debugLines.push(`Test Case Hash: ${args.testCaseHash}`);
       if (args.testExternalId) {
-        debugLines.push(
-          `Test Case Result ID: ${this.testCaseResultIdFromHash({
-            testExternalId: args.testExternalId,
-            testCaseHash: args.testCaseHash,
-          })}`,
-        );
+        try {
+          debugLines.push(
+            `Test Case Result ID: ${this.testCaseResultIdFromHash({
+              testExternalId: args.testExternalId,
+              testCaseHash: args.testCaseHash,
+            })}`,
+          );
+        } catch {
+          // Ignore
+        }
       }
     }
     if (args.evaluatorExternalId) {
