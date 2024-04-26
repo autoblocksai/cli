@@ -149,7 +149,7 @@ export class RunManager {
         commitCommittedDate: ciContext.commitCommittedDate,
         pullRequestNumber: ciContext.pullRequestNumber,
         pullRequestTitle: ciContext.pullRequestTitle,
-        promptSnapshots: ciContext.promptSnapshots,
+        autoblocksOverrides: ciContext.autoblocksOverrides,
       },
     );
 
