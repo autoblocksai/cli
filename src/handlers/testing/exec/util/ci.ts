@@ -58,6 +58,7 @@ const zPullRequestSchema = z.object({
   title: z.string(),
   head: z.object({
     ref: z.string(),
+    sha: z.string(),
   }),
 });
 
@@ -162,7 +163,6 @@ async function parseCommitFromGitLog(sha: string): Promise<Commit> {
 
 export async function makeCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
-  const commit = await parseCommitFromGitLog(env.GITHUB_SHA);
   const api = github.getOctokit(env.GITHUB_TOKEN);
 
   // GitHub Actions are triggered by webhook events, and the event payload is
@@ -174,6 +174,11 @@ export async function makeCIContext(): Promise<CIContext> {
   const repository = repositoryFromEvent(event);
   const pullRequest = pullRequestFromEvent(event);
   const autoblocksOverrides = autoblocksOverridesFromEvent(event);
+
+  // The commit sha for pull request events is the last merge commit
+  // but we want the commit sha of the head commit
+  const commitSha = pullRequest?.head.sha || env.GITHUB_SHA;
+  const commit = await parseCommitFromGitLog(commitSha);
 
   // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
   // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
