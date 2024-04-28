@@ -120,6 +120,14 @@ export async function exec(args: {
         );
       }
 
+      if (ciContext?.autoblocksOverrides?.configRevisions) {
+        // The config SDKs will use this environment variable to know that they
+        // need to pull down and use specific config revision(s)
+        commandEnv.AUTOBLOCKS_CONFIG_REVISIONS = JSON.stringify(
+          ciContext.autoblocksOverrides.configRevisions,
+        );
+      }
+
       // Execute the command
       execCommand(args.command, args.commandArgs, {
         env: commandEnv,

@@ -59,6 +59,8 @@ const zRepositorySchema = z.object({
 const zAutoblocksOverridesSchema = z.object({
   // Map of prompt external ID to a prompt revision ID
   promptRevisions: z.record(z.string(), z.string()),
+  // Map of config external ID to a config revision ID
+  configRevisions: z.record(z.string(), z.string()),
 });
 
 type PullRequest = z.infer<typeof zPullRequestSchema>;
