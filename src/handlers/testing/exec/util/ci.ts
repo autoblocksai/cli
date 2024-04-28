@@ -160,7 +160,7 @@ export async function makeCIContext(): Promise<CIContext> {
     workflowName: env.GITHUB_WORKFLOW,
     workflowRunNumber: env.GITHUB_RUN_NUMBER,
     commitSha: commit.sha,
-    commitMessage: commit.message,
+    commitMessage: commit.message.split('\n')[0],
     commitCommitterName: commit.committer.name,
     commitCommitterEmail: commit.committer.email,
     commitAuthorName: commit.author.name,
