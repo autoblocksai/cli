@@ -136,6 +136,7 @@ export function createHonoApp(runManager: RunManager): Hono {
         testCaseHash: z.string(),
         testCaseBody: z.unknown(),
         testCaseOutput: z.unknown(),
+        testCaseDurationMs: z.number().min(0).nullish(),
       }),
       handleValidationResult,
     ),
