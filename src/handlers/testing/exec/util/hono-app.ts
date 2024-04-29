@@ -134,7 +134,7 @@ export function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         testCaseHash: z.string(),
-        testCaseBody: z.unknown(),
+        testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
         testCaseDurationMs: z.number().min(0).nullish(),
       }),
