@@ -333,6 +333,7 @@ export class RunManager {
     testCaseHash: string;
     testCaseBody?: unknown;
     testCaseOutput?: unknown;
+    testCaseDurationMs?: number | null;
   }) {
     const events = this.testCaseEvents
       .filter(
@@ -351,6 +352,7 @@ export class RunManager {
         testCaseBody: args.testCaseBody,
         testCaseOutput: args.testCaseOutput,
         testCaseEvents: events,
+        testCaseDurationMs: args.testCaseDurationMs,
       },
     );
     if (!this.testCaseHashToResultId[args.testExternalId]) {
