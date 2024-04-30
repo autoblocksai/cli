@@ -15,6 +15,9 @@ const TEST_CASES_HEADER_NAME = 'Test Cases';
 // and the test case stats column
 const COLUMN_GAP = ' '.repeat(4);
 
+const GITHUB_COMMENT_BANNER_IMAGE =
+  'https://github.com/autoblocksai/cli/assets/7498009/53f0af0b-8ffd-4c95-8dbf-c96051ed5568';
+
 const statusToIcon: Record<TestRunStatus, string> = {
   [TestRunStatus.PASSED]: '✓',
   [TestRunStatus.FAILED]: '✗',
@@ -230,7 +233,7 @@ function makeGitHubComment(args: {
   ].join('&nbsp;&nbsp;•&nbsp;&nbsp;');
 
   const lines = [
-    `<p align="center"><img src="https://github.com/autoblocksai/cli/assets/7498009/53f0af0b-8ffd-4c95-8dbf-c96051ed5568" width="100%"></p>`,
+    `<p align="center"><img src="${GITHUB_COMMENT_BANNER_IMAGE}" width="100%"></p>`,
     `<p align="center">${statusHeaders}</p>`,
     '',
     '---',
