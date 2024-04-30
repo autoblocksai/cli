@@ -14,6 +14,7 @@ export interface CIContext {
   buildHtmlUrl: string;
   workflowName: string;
   workflowRunNumber: string;
+  jobName: string;
   commitSha: string;
   commitMessage: string;
   commitCommitterName: string;
@@ -40,6 +41,7 @@ const zGitHubEnvSchema = z.object({
   GITHUB_RUN_ATTEMPT: z.string(),
   GITHUB_WORKFLOW: z.string(),
   GITHUB_RUN_NUMBER: z.string(),
+  GITHUB_JOB: z.string(),
 });
 
 const zPullRequestSchema = z.object({
@@ -128,6 +130,25 @@ export async function makeCIContext(): Promise<CIContext> {
     commit_sha: commitSha,
   });
 
+  let pullRequestNumber: number | null = null;
+  let pullRequestTitle: string | null = null;
+  if (!pullRequest) {
+    // If the event is a `push` event, the pull request data won't be available in the event payload,
+    // but we can get the associated pull requests via the REST API.
+    const { data: associatedPullRequests } =
+      await api.rest.repos.listPullRequestsAssociatedWithCommit({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        commit_sha: commitSha,
+      });
+
+    pullRequestNumber = associatedPullRequests[0]?.number ?? null;
+    pullRequestTitle = associatedPullRequests[0]?.title || null;
+  } else {
+    pullRequestNumber = pullRequest.number;
+    pullRequestTitle = pullRequest.title;
+  }
+
   // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
   // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
   // name of the merge commit for the PR, like 5/merge.
@@ -161,6 +182,7 @@ export async function makeCIContext(): Promise<CIContext> {
     ].join('/'),
     workflowName: env.GITHUB_WORKFLOW,
     workflowRunNumber: env.GITHUB_RUN_NUMBER,
+    jobName: env.GITHUB_JOB,
     commitSha: commit.sha,
     commitMessage: commit.message.split('\n')[0],
     commitCommitterName: commit.committer.name,
@@ -168,8 +190,8 @@ export async function makeCIContext(): Promise<CIContext> {
     commitAuthorName: commit.author.name,
     commitAuthorEmail: commit.author.email,
     commitCommittedDate: commit.author.date,
-    pullRequestNumber: pullRequest?.number ?? null,
-    pullRequestTitle: pullRequest?.title || null,
+    pullRequestNumber,
+    pullRequestTitle,
     autoblocksOverrides: autoblocksOverrides,
   };
 }
