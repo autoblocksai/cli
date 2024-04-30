@@ -78,11 +78,20 @@ function genTestCases(n: number): MyTestCase[] {
 }
 
 (async () => {
-  await runTestSuite<MyTestCase, string>({
-    id: 'my-test-suite',
-    fn: testFn,
-    testCaseHash: ['input'],
-    testCases: genTestCases(4),
-    evaluators: [new HasAllSubstrings(), new IsFriendly()],
-  });
+  await Promise.allSettled([
+    runTestSuite<MyTestCase, string>({
+      id: 'typescript-e2e-test-suite-1',
+      fn: testFn,
+      testCaseHash: ['input'],
+      testCases: genTestCases(4),
+      evaluators: [new HasAllSubstrings(), new IsFriendly()],
+    }),
+    runTestSuite<MyTestCase, string>({
+      id: 'typescript-e2e-test-suite-2',
+      fn: testFn,
+      testCaseHash: ['input'],
+      testCases: genTestCases(10),
+      evaluators: [new HasAllSubstrings(), new IsFriendly()],
+    }),
+  ]);
 })();
