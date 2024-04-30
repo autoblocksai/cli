@@ -137,7 +137,7 @@ export class RunManager {
         repositoryHtmlUrl: ciContext.repoHtmlUrl,
         branchExternalId: ciContext.branchId,
         branchName: ciContext.branchName,
-        isDefaultBranch: ciContext.branchName === ciContext.defaultBranchName,
+        isDefaultBranch: ciContext.isDefaultBranch,
         ciProvider: ciContext.ciProvider,
         buildHtmlUrl: ciContext.buildHtmlUrl,
         commitSha: ciContext.commitSha,
