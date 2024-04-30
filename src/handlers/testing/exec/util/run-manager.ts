@@ -471,6 +471,10 @@ export class RunManager {
   }
 
   async postComments(args: { slackWebhookUrl: string | undefined }) {
+    if (!this.isCI) {
+      return;
+    }
+
     if (
       !this.ciBranchId ||
       !this.ciBuildId ||
