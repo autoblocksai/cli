@@ -1,7 +1,8 @@
-import { CIContext } from './ci';
+import type { CIContext } from './ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
-import { Evaluation, EvaluationPassed, TestRunStatus } from './models';
+import { type Evaluation, EvaluationPassed, TestRunStatus } from './models';
 import { makeAutoblocksCIBuildHtmlUrl } from './url';
+import github from '@actions/github';
 
 // Commit messages are truncated if they're longer than this
 const MAX_COMMIT_MESSAGE_LENGTH = 50;
@@ -13,6 +14,21 @@ const TEST_CASES_HEADER_NAME = 'Test Cases';
 // The number of spaces between the evaluator name column
 // and the test case stats column
 const COLUMN_GAP = ' '.repeat(4);
+
+const GITHUB_COMMENT_BANNER_IMAGE =
+  'https://github.com/autoblocksai/cli/assets/7498009/53f0af0b-8ffd-4c95-8dbf-c96051ed5568';
+
+const statusToIcon: Record<TestRunStatus, string> = {
+  [TestRunStatus.PASSED]: '✓',
+  [TestRunStatus.FAILED]: '✗',
+  [TestRunStatus.NO_RESULTS]: '?',
+};
+
+const statusToLabel: Record<TestRunStatus, string> = {
+  [TestRunStatus.PASSED]: 'PASSED',
+  [TestRunStatus.FAILED]: 'FAILED',
+  [TestRunStatus.NO_RESULTS]: 'NO RESULTS',
+};
 
 export async function postSlackMessage(args: {
   webhookUrl: string;
@@ -33,6 +49,231 @@ export async function postSlackMessage(args: {
     const data = await resp.text();
     throw new Error(`HTTP Request Error: ${data}`);
   }
+}
+
+async function findExistingCommentIdOnCommit(args: {
+  githubToken: string;
+  commitSha: string;
+  workflowName: string;
+  jobName: string;
+}): Promise<number | null> {
+  const api = github.getOctokit(args.githubToken);
+  for await (const response of api.paginate.iterator(
+    'GET /repos/{owner}/{repo}/commits/{commit_sha}/comments',
+    {
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      commit_sha: args.commitSha,
+    },
+  )) {
+    for (const comment of response.data) {
+      if (
+        comment.body.includes(
+          autoblocksGitHubCommentId({
+            workflowName: args.workflowName,
+            jobName: args.jobName,
+          }),
+        )
+      ) {
+        return comment.id;
+      }
+    }
+  }
+
+  return null;
+}
+
+async function findExistingCommentIdOnPullRequest(args: {
+  githubToken: string;
+  pullRequestNumber: number;
+  workflowName: string;
+  jobName: string;
+}): Promise<number | null> {
+  const api = github.getOctokit(args.githubToken);
+  for await (const response of api.paginate.iterator(
+    'GET /repos/{owner}/{repo}/issues/{issue_number}/comments',
+    {
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      issue_number: args.pullRequestNumber,
+    },
+  )) {
+    for (const comment of response.data) {
+      if (
+        comment.body?.includes(
+          autoblocksGitHubCommentId({
+            workflowName: args.workflowName,
+            jobName: args.jobName,
+          }),
+        )
+      ) {
+        return comment.id;
+      }
+    }
+  }
+
+  return null;
+}
+
+export async function postGitHubComment(args: {
+  githubToken: string;
+  branchId: string;
+  buildId: string;
+  ciContext: CIContext;
+  runDurationMs: number;
+  evaluations: Evaluation[];
+}) {
+  const api = github.getOctokit(args.githubToken);
+  const comment = makeGitHubComment(args);
+
+  // Comment on the pull request if there is an associated pull request number
+  // and we're not on the default branch
+  if (
+    args.ciContext.pullRequestNumber !== null &&
+    !args.ciContext.isDefaultBranch
+  ) {
+    // Check if there is an existing comment on the PR
+    const existingCommentId = await findExistingCommentIdOnPullRequest({
+      githubToken: args.githubToken,
+      pullRequestNumber: args.ciContext.pullRequestNumber,
+      workflowName: args.ciContext.workflowName,
+      jobName: args.ciContext.jobName,
+    });
+    if (existingCommentId !== null) {
+      // Update the existing comment on the PR
+      try {
+        await api.rest.issues.updateComment({
+          owner: github.context.repo.owner,
+          repo: github.context.repo.repo,
+          comment_id: existingCommentId,
+          body: comment,
+        });
+        return;
+      } catch {
+        // This will fail if we don't have permission to comment on PRs,
+        // so we'll continue to commenting on the commit instead
+      }
+    } else {
+      // Create a new comment on the PR
+      try {
+        await api.rest.issues.createComment({
+          owner: github.context.repo.owner,
+          repo: github.context.repo.repo,
+          issue_number: args.ciContext.pullRequestNumber,
+          body: comment,
+        });
+        return;
+      } catch {
+        // This will fail if we don't have permission to comment on PRs,
+        // so we'll continue to commenting on the commit instead
+      }
+    }
+  }
+  const existingCommentId = await findExistingCommentIdOnCommit({
+    githubToken: args.githubToken,
+    commitSha: args.ciContext.commitSha,
+    workflowName: args.ciContext.workflowName,
+    jobName: args.ciContext.jobName,
+  });
+  if (existingCommentId !== null) {
+    // Update the existing comment on the commit
+    await api.rest.repos.updateCommitComment({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      comment_id: existingCommentId,
+      body: comment,
+    });
+    return;
+  } else {
+    // Create a new comment on the commit
+    await api.rest.repos.createCommitComment({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      commit_sha: args.ciContext.commitSha,
+      body: comment,
+    });
+  }
+}
+
+/**
+ * Used to identify comments made by us.
+ *
+ * Assumes users only run one `npx autoblocks testing exec` command per workflow job.
+ */
+function autoblocksGitHubCommentId(args: {
+  workflowName: string;
+  jobName: string;
+}): string {
+  return `<!--- autoblocks-${args.workflowName}-${args.jobName} -->`;
+}
+
+function makeGitHubComment(args: {
+  branchId: string;
+  buildId: string;
+  ciContext: CIContext;
+  runDurationMs: number;
+  evaluations: Evaluation[];
+}): string {
+  const autoblocksUrl = makeAutoblocksCIBuildHtmlUrl({
+    branchId: args.branchId,
+    buildId: args.buildId,
+  });
+  const status = makeTestRunStatusFromEvaluations(args.evaluations);
+  const statusIcon = statusToIcon[status];
+  const statusLabel = statusToLabel[status];
+  const duration = makeDurationString(args.runDurationMs);
+  const buildName = makeBuildName({
+    workflowName: args.ciContext.workflowName,
+    workflowRunNumber: args.ciContext.workflowRunNumber,
+    jobName: args.ciContext.jobName,
+  });
+  const buildUrl = args.ciContext.buildHtmlUrl;
+
+  const statusHeaders = [
+    `${statusIcon} <code>${statusLabel}</code>`,
+    `🕐 ${duration}`,
+    `🏗️ <a href="${buildUrl}">${buildName}</a>`,
+    `➡️ <a href="${autoblocksUrl}">View in Autoblocks</a>`,
+  ].join('&nbsp;&nbsp;•&nbsp;&nbsp;');
+
+  const lines = [
+    `<p align="center"><img src="${GITHUB_COMMENT_BANNER_IMAGE}" width="100%"></p>`,
+    `<p align="center">${statusHeaders}</p>`,
+    '',
+    '---',
+    '',
+  ];
+
+  // Note we don't share this with the Slack emoji map because Slack calls
+  // it :large_green_circle: instead of :green_circle: 🙃
+  const statusToEmoji: Record<TestRunStatus, string> = {
+    [TestRunStatus.PASSED]: ':green_circle:',
+    [TestRunStatus.FAILED]: ':red_circle:',
+    [TestRunStatus.NO_RESULTS]: ':grey_question:',
+  };
+
+  for (const testExternalId of sortedUniqueTestExternalIds(args.evaluations)) {
+    const evaluations = args.evaluations.filter(
+      (e) => e.testExternalId === testExternalId,
+    );
+    const emoji = statusToEmoji[makeTestRunStatusFromEvaluations(evaluations)];
+    lines.push(`${emoji}&nbsp;&nbsp;**${testExternalId}**`);
+    lines.push('```');
+    lines.push(makeEvaluatorStatsTable({ evaluations }));
+    lines.push('```');
+  }
+
+  lines.push(
+    `<p align="right">Generated by <a href="https://www.autoblocks.ai/">Autoblocks</a> against ${args.ciContext.commitSha}</p>`,
+  );
+  lines.push(
+    autoblocksGitHubCommentId({
+      workflowName: args.ciContext.workflowName,
+      jobName: args.ciContext.jobName,
+    }),
+  );
+
+  return lines.join('\n');
 }
 
 function makeSlackMessageBlocks(args: {
@@ -87,27 +328,32 @@ function makeDurationString(durationMs: number): string {
   return `${Math.floor(durationMinutes)}m ${Math.floor(durationSeconds % 60)}s`;
 }
 
+function makeBuildName(args: {
+  workflowName: string;
+  workflowRunNumber: string;
+  jobName: string;
+}): string {
+  return `${args.workflowName} / ${args.jobName} (#${args.workflowRunNumber})`;
+}
+
+function sortedUniqueTestExternalIds(evaluations: Evaluation[]): string[] {
+  return [...new Set(evaluations.map((e) => e.testExternalId))].sort();
+}
+
 function makeStatusHeaderSection(args: {
   ciContext: CIContext;
   runDurationMs: number;
   evaluations: Evaluation[];
 }) {
-  const statusToIcon: Record<TestRunStatus, string> = {
-    [TestRunStatus.PASSED]: '✓',
-    [TestRunStatus.FAILED]: '✗',
-    [TestRunStatus.NO_RESULTS]: '?',
-  };
-  const statusToLabel: Record<TestRunStatus, string> = {
-    [TestRunStatus.PASSED]: 'PASSED',
-    [TestRunStatus.FAILED]: 'FAILED',
-    [TestRunStatus.NO_RESULTS]: 'NO RESULTS',
-  };
-
   const status = makeTestRunStatusFromEvaluations(args.evaluations);
   const statusIcon = statusToIcon[status];
   const statusLabel = statusToLabel[status];
   const duration = makeDurationString(args.runDurationMs);
-  const buildName = `${args.ciContext.workflowName} #${args.ciContext.workflowRunNumber}`;
+  const buildName = makeBuildName({
+    workflowName: args.ciContext.workflowName,
+    workflowRunNumber: args.ciContext.workflowRunNumber,
+    jobName: args.ciContext.jobName,
+  });
   const commitUrl = `${args.ciContext.repoHtmlUrl}/commit/${args.ciContext.commitSha}`;
   const truncatedCommitMessage =
     args.ciContext.commitMessage.length > MAX_COMMIT_MESSAGE_LENGTH
@@ -139,15 +385,14 @@ function makeStatusHeaderSection(args: {
 }
 
 function makeAllTestSuiteSections(args: { evaluations: Evaluation[] }) {
-  const uniqTestExternalIds = [
-    ...new Set(args.evaluations.map((e) => e.testExternalId)),
-  ].sort();
-  return uniqTestExternalIds.flatMap((testExternalId) => {
-    const evaluations = args.evaluations.filter(
-      (e) => e.testExternalId === testExternalId,
-    );
-    return makeSectionsForTestSuite({ testExternalId, evaluations });
-  });
+  return sortedUniqueTestExternalIds(args.evaluations).flatMap(
+    (testExternalId) => {
+      const evaluations = args.evaluations.filter(
+        (e) => e.testExternalId === testExternalId,
+      );
+      return makeSectionsForTestSuite({ testExternalId, evaluations });
+    },
+  );
 }
 
 function makeSectionsForTestSuite(args: {
