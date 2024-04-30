@@ -230,7 +230,7 @@ function makeGitHubComment(args: {
   ].join('&nbsp;&nbsp;•&nbsp;&nbsp;');
 
   const lines = [
-    `<p align="center"><img src="https://app.autoblocks.ai/images/logo.png" height="20px"></p>`,
+    `<p align="center"><img src="https://github.com/autoblocksai/cli/assets/7498009/53f0af0b-8ffd-4c95-8dbf-c96051ed5568" width="100%"></p>`,
     `<p align="center">${statusHeaders}</p>`,
     '',
     '---',
