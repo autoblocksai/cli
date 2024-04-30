@@ -9,7 +9,7 @@ export interface CIContext {
   repoHtmlUrl: string;
   branchId: string;
   branchName: string;
-  defaultBranchName: string;
+  isDefaultBranch: boolean;
   ciProvider: 'github';
   buildHtmlUrl: string;
   workflowName: string;
@@ -169,7 +169,7 @@ export async function makeCIContext(): Promise<CIContext> {
     repoHtmlUrl: [env.GITHUB_SERVER_URL, env.GITHUB_REPOSITORY].join('/'),
     branchId: ref.node_id,
     branchName,
-    defaultBranchName: repository.default_branch,
+    isDefaultBranch: branchName === repository.default_branch,
     ciProvider: 'github',
     buildHtmlUrl: [
       env.GITHUB_SERVER_URL,

@@ -127,7 +127,11 @@ export async function postGitHubComment(args: {
   const comment = makeGitHubComment(args);
 
   // Comment on the pull request if there is an associated pull request number
-  if (args.ciContext.pullRequestNumber !== null) {
+  // and we're not on the default branch
+  if (
+    args.ciContext.pullRequestNumber !== null &&
+    !args.ciContext.isDefaultBranch
+  ) {
     // Check if there is an existing comment on the PR
     const existingCommentId = await findExistingCommentIdOnPullRequest({
       githubToken: args.githubToken,
