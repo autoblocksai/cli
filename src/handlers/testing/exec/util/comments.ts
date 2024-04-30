@@ -190,6 +190,8 @@ export async function postGitHubComment(args: {
 
 /**
  * Used to identify comments made by us.
+ *
+ * Assumes users only run one `npx autoblocks testing exec` command per workflow job.
  */
 function autoblocksGitHubCommentId(args: {
   workflowName: string;
