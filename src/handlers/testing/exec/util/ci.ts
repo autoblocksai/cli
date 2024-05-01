@@ -12,6 +12,7 @@ export interface CIContext {
   isDefaultBranch: boolean;
   ciProvider: 'github';
   buildHtmlUrl: string;
+  workflowId: string;
   workflowName: string;
   workflowRunNumber: string;
   jobName: string;
@@ -29,6 +30,8 @@ export interface CIContext {
   autoblocksOverrides: AutoblocksOverrides | null;
 }
 
+const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
+
 const zGitHubEnvSchema = z.object({
   GITHUB_ACTIONS: z.literal('true'),
   GITHUB_TOKEN: z.string(),
@@ -40,6 +43,7 @@ const zGitHubEnvSchema = z.object({
   GITHUB_RUN_ID: z.string(),
   GITHUB_RUN_ATTEMPT: z.string(),
   GITHUB_WORKFLOW: z.string(),
+  GITHUB_WORKFLOW_REF: z.string(),
   GITHUB_RUN_NUMBER: z.string(),
   GITHUB_JOB: z.string(),
 });
@@ -93,7 +97,7 @@ function repositoryFromEvent(event: { repository?: unknown }): Repository {
 function autoblocksOverridesFromEvent(event: {
   inputs?: Record<string, unknown>;
 }): AutoblocksOverrides | null {
-  const overridesRaw = event.inputs?.['autoblocks-overrides'];
+  const overridesRaw = event.inputs?.[AUTOBLOCKS_OVERRIDES_INPUT_NAME];
   if (!overridesRaw) {
     return null;
   }
@@ -104,6 +108,20 @@ function autoblocksOverridesFromEvent(event: {
   return zAutoblocksOverridesSchema.parse(JSON.parse(`${overridesRaw}`));
 }
 
+/**
+ * Parses the workflow ID out of the workflow ref. For example:
+ *
+ * "workflow_ref": "autoblocksai/cli/.github/workflows/e2e.yml@refs/heads/nicole/epd-868-cli-pass-along-testcaserevisionusage"
+ *
+ * Workflow ID: e2e.yml
+ */
+function parseWorkflowIdFromWorkflowRef(args: { workflowRef: string }): string {
+  const parts = args.workflowRef.split('@refs/');
+  const workflowPath = parts[0];
+  const workflowParts = workflowPath.split('/');
+  return workflowParts[workflowParts.length - 1];
+}
+
 export async function makeCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
   const api = github.getOctokit(env.GITHUB_TOKEN);
@@ -112,23 +130,38 @@ export async function makeCIContext(): Promise<CIContext> {
   // stored in a JSON file at $GITHUB_EVENT_PATH.
   // You can see the schema of the various webhook payloads at:
   // https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads
-  const event = JSON.parse(await fs.readFile(env.GITHUB_EVENT_PATH, 'utf-8'));
+  const eventRaw = JSON.parse(
+    await fs.readFile(env.GITHUB_EVENT_PATH, 'utf-8'),
+  );
 
-  const repository = repositoryFromEvent(event);
-  const pullRequest = pullRequestFromEvent(event);
-  const autoblocksOverrides = autoblocksOverridesFromEvent(event);
+  const repository = repositoryFromEvent(eventRaw);
+  const pullRequest = pullRequestFromEvent(eventRaw);
+  const autoblocksOverrides = autoblocksOverridesFromEvent(eventRaw);
 
-  // The GITHUB_SHA env var for pull request events is the last merge commit
-  // on GITHUB_REF, but we want the commit sha of the head commit of the PR.
-  const commitSha = pullRequest?.head.sha || env.GITHUB_SHA;
+  const { commitSha, branchName } = pullRequest
+    ? // For pull request events we want the commit sha and branch name of the head commit,
+      // since for pull request events the commit data is for the last merge commit and not
+      // the head commit
+      // See https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request
+      { commitSha: pullRequest.head.sha, branchName: pullRequest.head.ref }
+    : // Otherwise we can use the GITHUB_SHA and GITHUB_REF_NAME env vars
+      { commitSha: env.GITHUB_SHA, branchName: env.GITHUB_REF_NAME };
 
-  // Get the commit via REST API since for pull requests the commit data
-  // is for the last merge commit and not the head commit.
-  const { data: commit } = await api.rest.git.getCommit({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    commit_sha: commitSha,
-  });
+  const [{ data: commit }, { data: ref }] = await Promise.all([
+    // Get the commit via REST API since for pull requests the commit data
+    // is for the last merge commit and not the head commit
+    api.rest.git.getCommit({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      commit_sha: commitSha,
+    }),
+    // Get the branch via the REST API so we can get its internal node ID
+    api.rest.git.getRef({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      ref: `heads/${branchName}`,
+    }),
+  ]);
 
   let pullRequestNumber: number | null = null;
   let pullRequestTitle: string | null = null;
@@ -149,18 +182,6 @@ export async function makeCIContext(): Promise<CIContext> {
     pullRequestTitle = pullRequest.title;
   }
 
-  // When it's a `push` event, the branch name is in `GITHUB_REF_NAME`, but on the `pull_request`
-  // event we want to use event.pull_request.head.ref, since `GITHUB_REF_NAME` will contain the
-  // name of the merge commit for the PR, like 5/merge.
-  const branchName = pullRequest?.head.ref || env.GITHUB_REF_NAME;
-
-  // Get the branch via the REST API so we can get its internal node ID
-  const { data: ref } = await api.rest.git.getRef({
-    owner: github.context.repo.owner,
-    repo: github.context.repo.repo,
-    ref: `heads/${branchName}`,
-  });
-
   return {
     gitProvider: 'github',
     repoId: repository.id,
@@ -180,6 +201,9 @@ export async function makeCIContext(): Promise<CIContext> {
       'attempts',
       env.GITHUB_RUN_ATTEMPT,
     ].join('/'),
+    workflowId: parseWorkflowIdFromWorkflowRef({
+      workflowRef: env.GITHUB_WORKFLOW_REF,
+    }),
     workflowName: env.GITHUB_WORKFLOW,
     workflowRunNumber: env.GITHUB_RUN_NUMBER,
     jobName: env.GITHUB_JOB,
