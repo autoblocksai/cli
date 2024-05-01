@@ -2,6 +2,8 @@ import { z } from 'zod';
 import github from '@actions/github';
 import fs from 'fs/promises';
 
+const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
+
 export interface CIContext {
   gitProvider: 'github';
   repoId: string;
@@ -29,8 +31,6 @@ export interface CIContext {
   // This is parsed from the GitHub Actions workflow inputs.
   autoblocksOverrides: AutoblocksOverrides | null;
 }
-
-const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
 
 const zGitHubEnvSchema = z.object({
   GITHUB_ACTIONS: z.literal('true'),
