@@ -168,15 +168,19 @@ export async function makeCIContext(): Promise<CIContext> {
   if (!pullRequest) {
     // If the event is a `push` event, the pull request data won't be available in the event payload,
     // but we can get the associated pull requests via the REST API.
-    const { data: associatedPullRequests } =
-      await api.rest.repos.listPullRequestsAssociatedWithCommit({
-        owner: github.context.repo.owner,
-        repo: github.context.repo.repo,
-        commit_sha: commitSha,
-      });
+    try {
+      const { data: associatedPullRequests } =
+        await api.rest.repos.listPullRequestsAssociatedWithCommit({
+          owner: github.context.repo.owner,
+          repo: github.context.repo.repo,
+          commit_sha: commitSha,
+        });
 
-    pullRequestNumber = associatedPullRequests[0]?.number ?? null;
-    pullRequestTitle = associatedPullRequests[0]?.title || null;
+      pullRequestNumber = associatedPullRequests[0]?.number ?? null;
+      pullRequestTitle = associatedPullRequests[0]?.title || null;
+    } catch {
+      // Might not have permissions
+    }
   } else {
     pullRequestNumber = pullRequest.number;
     pullRequestTitle = pullRequest.title;
