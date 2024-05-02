@@ -330,7 +330,7 @@ function makeDurationString(durationMs: number): string {
 
 function makeBuildName(args: {
   workflowName: string;
-  workflowRunNumber: string;
+  workflowRunNumber: number;
   jobName: string;
 }): string {
   return `${args.workflowName} / ${args.jobName} (#${args.workflowRunNumber})`;
