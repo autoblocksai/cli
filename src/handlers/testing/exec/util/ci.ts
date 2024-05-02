@@ -13,7 +13,7 @@ export interface CIContext {
   ciProvider: 'github';
   buildHtmlUrl: string;
   workflowName: string;
-  workflowRunNumber: string;
+  workflowRunNumber: number;
   jobName: string;
   commitSha: string;
   commitMessage: string;
@@ -40,7 +40,7 @@ const zGitHubEnvSchema = z.object({
   GITHUB_RUN_ID: z.string(),
   GITHUB_RUN_ATTEMPT: z.string(),
   GITHUB_WORKFLOW: z.string(),
-  GITHUB_RUN_NUMBER: z.string(),
+  GITHUB_RUN_NUMBER: z.coerce.number(),
   GITHUB_JOB: z.string(),
 });
 
