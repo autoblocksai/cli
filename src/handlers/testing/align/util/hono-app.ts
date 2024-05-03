@@ -47,7 +47,7 @@ export function createHonoApp(sessionManager: SessionManager): Hono {
         event: z.object({
           message: z.string(),
           traceId: z.string(),
-          timestamp: z.string(),
+          timestamp: z.string().datetime({ offset: true }),
           properties: z.unknown(),
         }),
       }),

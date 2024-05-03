@@ -82,7 +82,7 @@ export function createHonoApp(runManager: RunManager): Hono {
         event: z.object({
           message: z.string(),
           traceId: z.string(),
-          timestamp: z.string(),
+          timestamp: z.string().datetime({ offset: true }),
           properties: z.unknown(),
         }),
       }),
@@ -137,6 +137,16 @@ export function createHonoApp(runManager: RunManager): Hono {
         testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
         testCaseDurationMs: z.number().min(0).nullish(),
+        testCaseRevisionUsage: z
+          .array(
+            z.object({
+              entityExternalId: z.string(),
+              entityType: z.enum(['prompt', 'config']),
+              revisionId: z.string().cuid2(),
+              usedAt: z.string().datetime({ offset: true }),
+            }),
+          )
+          .nullish(),
       }),
       handleValidationResult,
     ),

@@ -160,17 +160,15 @@ export async function exec(args: {
         .finally(async () => {
           runManager.setEndTime();
 
-          if (args.slackWebhookUrl) {
-            // Post to Slack if a webhook URL has been set.
-            // Note: this doesn't happen in cleanup() because that
-            // function is also called during unexpected termination
-            // and makes a best effort to clean up resources, whereas
-            // we only want to post to Slack if the command has
-            // successfully executed.
-            await runManager.postSlackMessage({
-              webhookUrl: args.slackWebhookUrl,
-            });
-          }
+          // Post comments to Slack and GitHub (if set up)
+          // Note: this doesn't happen in cleanup() because that
+          // function is also called during unexpected termination
+          // and makes a best effort to clean up resources, whereas
+          // we only want to post comments if the command has
+          // successfully executed.
+          await runManager.postComments({
+            slackWebhookUrl: args.slackWebhookUrl,
+          });
 
           await cleanup();
         });
