@@ -1,11 +1,11 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono, type Context } from 'hono';
-import { SafeParseReturnType, z } from 'zod';
+import { type ZodError, z } from 'zod';
 import { Language } from './models';
 import { SessionManager } from './session-manager';
 
 const handleValidationResult = (
-  result: SafeParseReturnType<unknown, unknown>,
+  result: { success: boolean; error?: ZodError<unknown> },
   c: Context,
 ) => {
   if (!result.success) {
