@@ -1,6 +1,6 @@
 import { zValidator } from '@hono/zod-validator';
 import { Hono, type Context } from 'hono';
-import { SafeParseReturnType, z } from 'zod';
+import { type ZodError, z } from 'zod';
 import { EventName, emitter } from './emitter';
 import { RunManager } from './run-manager';
 
@@ -23,7 +23,7 @@ export function createHonoApp(runManager: RunManager): Hono {
   });
 
   const handleValidationResult = (
-    result: SafeParseReturnType<unknown, unknown>,
+    result: { success: boolean; error?: ZodError<unknown> },
     c: Context,
   ) => {
     if (!result.success) {
@@ -134,7 +134,7 @@ export function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         testCaseHash: z.string(),
-        testCaseBody: z.unknown(),
+        testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
         testCaseDurationMs: z.number().min(0).nullish(),
         testCaseRevisionUsage: z

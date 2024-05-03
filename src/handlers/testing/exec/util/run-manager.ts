@@ -335,7 +335,7 @@ export class RunManager {
   async handleTestCaseResult(args: {
     testExternalId: string;
     testCaseHash: string;
-    testCaseBody?: unknown;
+    testCaseBody: Record<string, unknown>;
     testCaseOutput?: unknown;
     testCaseDurationMs?: number | null;
     testCaseRevisionUsage?:
