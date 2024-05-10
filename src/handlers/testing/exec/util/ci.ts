@@ -63,6 +63,8 @@ const zRepositorySchema = z.object({
 });
 
 const zAutoblocksOverridesSchema = z.object({
+  // Map of test external ID to list of test case hashes
+  testsAndHashes: z.record(z.string(), z.array(z.string())).optional(),
   // Map of prompt external ID to a prompt revision ID
   promptRevisions: z.record(z.string(), z.string()).optional(),
   // Map of config external ID to a config revision ID
