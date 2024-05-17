@@ -176,12 +176,17 @@ export async function makeCIContext(): Promise<CIContext> {
           commit_sha: commitSha,
         });
 
+      // eslint-disable-next-line no-console
+      console.error(
+        `Fetched associated PRs: ${JSON.stringify(associatedPullRequests)}`,
+      );
+
       pullRequestNumber = associatedPullRequests[0]?.number ?? null;
       pullRequestTitle = associatedPullRequests[0]?.title || null;
     } catch (err) {
       // Might not have permissions
       // eslint-disable-next-line no-console
-      console.error(err);
+      console.error(`Couldn't fetch associated PRs: ${err}`);
     }
   } else {
     pullRequestNumber = pullRequest.number;
