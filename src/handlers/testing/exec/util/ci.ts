@@ -136,6 +136,8 @@ export async function makeCIContext(): Promise<CIContext> {
 
   const repository = repositoryFromEvent(eventRaw);
   const pullRequest = pullRequestFromEvent(eventRaw);
+  // eslint-disable-next-line no-console
+  console.log('pullRequest', pullRequest);
   const autoblocksOverrides = autoblocksOverridesFromEvent(eventRaw);
 
   const { commitSha, branchName } = pullRequest
