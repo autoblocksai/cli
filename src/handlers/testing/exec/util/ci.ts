@@ -178,8 +178,10 @@ export async function makeCIContext(): Promise<CIContext> {
 
       pullRequestNumber = associatedPullRequests[0]?.number ?? null;
       pullRequestTitle = associatedPullRequests[0]?.title || null;
-    } catch {
+    } catch (err) {
       // Might not have permissions
+      // eslint-disable-next-line no-console
+      console.error(err);
     }
   } else {
     pullRequestNumber = pullRequest.number;

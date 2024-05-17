@@ -19,7 +19,7 @@ env:
 
 # That with restricted permissions
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   py:
