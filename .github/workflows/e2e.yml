@@ -4,7 +4,7 @@ on:
   # Run on different types of events to ensure we are
   # handling the git data correctly in each scenario
   push:
-  pull_request:
+  # pull_request:
   workflow_dispatch:
     inputs:
       autoblocks-overrides:
