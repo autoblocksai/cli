@@ -17,7 +17,7 @@ on:
 env:
   TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
 
-# That with restricted permissions
+# Test with restricted permissions
 permissions:
   contents: read
 
