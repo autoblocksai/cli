@@ -51,7 +51,7 @@ type Schemas = {
 };
 
 export function makeSDKEnvVars(args: Partial<Schemas>): Record<string, string> {
-  const env = process.env as Record<string, string>;
+  const env = { ...process.env } as Record<string, string>;
 
   Object.entries(args).forEach(([k, v]) => {
     if (v === undefined) {
