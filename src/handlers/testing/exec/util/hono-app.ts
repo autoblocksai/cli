@@ -147,6 +147,22 @@ export function createHonoApp(runManager: RunManager): Hono {
             }),
           )
           .nullish(),
+        testCaseHumanReviewInputFields: z
+          .array(
+            z.object({
+              name: z.string(),
+              value: z.string(),
+            }),
+          )
+          .nullish(),
+        testCaseHumanReviewOutputFields: z
+          .array(
+            z.object({
+              name: z.string(),
+              value: z.string(),
+            }),
+          )
+          .nullish(),
       }),
       handleValidationResult,
     ),

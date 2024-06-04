@@ -346,6 +346,8 @@ export class RunManager {
           usedAt: string;
         }[]
       | null;
+    testCaseHumanReviewInputFields?: { name: string; value: string }[] | null;
+    testCaseHumanReviewOutputFields?: { name: string; value: string }[] | null;
   }) {
     const events = this.testCaseEvents
       .filter(
@@ -366,6 +368,8 @@ export class RunManager {
         testCaseEvents: events,
         testCaseDurationMs: args.testCaseDurationMs,
         testCaseRevisionUsage: args.testCaseRevisionUsage,
+        testCaseHumanReviewInputFields: args.testCaseHumanReviewInputFields,
+        testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
       },
     );
     if (!this.testCaseHashToResultId[args.testExternalId]) {
