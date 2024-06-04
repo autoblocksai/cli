@@ -6,6 +6,7 @@ import { EventName, emitter } from './util/emitter';
 import { findAvailablePort } from './util/net';
 import { RunManager } from './util/run-manager';
 import { createHonoApp } from './util/hono-app';
+import { SDKEnvironmentVariable, makeSDKEnvVars } from '../../../util/sdk-env';
 
 /**
  * Exec command while local server is running
@@ -107,30 +108,17 @@ export async function exec(args: {
         message: `Running command: ${args.command} ${args.commandArgs.join(' ')}`,
       });
 
-      // Set environment variables for the SDKs to use
-      const commandEnv: Record<string, string> = {
-        ...process.env,
-        AUTOBLOCKS_CLI_SERVER_ADDRESS: serverAddress,
-      };
-      if (ciContext?.autoblocksOverrides?.promptRevisions) {
-        // The prompt SDKs will use this environment variable to know that they
-        // need to pull down and use prompt snapshot(s)
-        commandEnv.AUTOBLOCKS_PROMPT_REVISIONS = JSON.stringify(
-          ciContext.autoblocksOverrides.promptRevisions,
-        );
-      }
-
-      if (ciContext?.autoblocksOverrides?.configRevisions) {
-        // The config SDKs will use this environment variable to know that they
-        // need to pull down and use specific config revision(s)
-        commandEnv.AUTOBLOCKS_CONFIG_REVISIONS = JSON.stringify(
-          ciContext.autoblocksOverrides.configRevisions,
-        );
-      }
-
       // Execute the command
       execCommand(args.command, args.commandArgs, {
-        env: commandEnv,
+        env: makeSDKEnvVars({
+          [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: serverAddress,
+          [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]:
+            ciContext?.autoblocksOverrides?.testsAndHashes,
+          [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_PROMPT_REVISIONS]:
+            ciContext?.autoblocksOverrides?.promptRevisions,
+          [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_CONFIG_REVISIONS]:
+            ciContext?.autoblocksOverrides?.configRevisions,
+        }),
         // will return error code as response (even if it's non-zero)
         ignoreReturnCode: true,
         silent: true,
