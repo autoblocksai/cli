@@ -207,6 +207,16 @@ export function createHonoApp(runManager: RunManager): Hono {
           .unknown()
           .nullish()
           .transform((x) => x ?? undefined),
+        revisionUsage: z
+          .array(
+            z.object({
+              entityExternalId: z.string(),
+              entityType: z.enum(['prompt', 'config']),
+              revisionId: z.string().cuid2(),
+              usedAt: z.string().datetime({ offset: true }),
+            }),
+          )
+          .nullish(),
       }),
       handleValidationResult,
     ),
