@@ -418,6 +418,14 @@ export class RunManager {
       gte?: number;
     };
     metadata?: unknown;
+    revisionUsage?:
+      | {
+          entityExternalId: string;
+          entityType: string;
+          revisionId: string;
+          usedAt: string;
+        }[]
+      | null;
   }): Promise<void> {
     let passed: EvaluationPassed;
 
@@ -462,6 +470,7 @@ export class RunManager {
       passed: passedForApi,
       threshold: args.threshold,
       metadata: args.metadata,
+      revisionUsage: args.revisionUsage,
     });
 
     this.evaluations.push({
