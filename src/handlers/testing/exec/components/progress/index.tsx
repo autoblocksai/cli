@@ -1,12 +1,14 @@
-import { Box, Spacer, Static, Text, render } from 'ink';
+import { Box, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
 import {
-  makeAutoblocksCIBuildHtmlUrl,
-  makeAutoblocksLocalTestHtmlUrl,
+  makeAutoblocksCIBuildSummaryHtmlUrl,
+  makeAutoblocksLocalTestResultsHtmlUrl,
+  makeAutoblocksCITestResultsHtmlUrl,
+  makeAutoblocksHumanReviewHtmlUrl,
 } from '../../util/url';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
@@ -19,6 +21,12 @@ interface AppProps {
   onListenersCreated: () => void;
   ciBranchId: string | undefined;
   ciBuildId: string | undefined;
+}
+
+interface RunMeta {
+  id: string;
+  ended: boolean;
+  shareUrl: string | undefined;
 }
 
 const MAX_TEST_CASES = 100;
@@ -73,9 +81,9 @@ function makeColorFromLogLevel(
 }
 
 function TestRow(props: {
-  runIsOver: boolean;
-  shareUrl?: string;
   testExternalId: string;
+  ciBranchId: string | undefined;
+  runMeta: RunMeta | undefined;
   evals: Evaluation[];
   errors: UncaughtError[];
 }) {
@@ -96,35 +104,33 @@ function TestRow(props: {
   const { color: testStatusColor, icon: testStatusIcon } =
     statusToColorAndIcon[testStatus];
 
+  const resultsUrl: string | null = (() => {
+    if (!process.env.CI) {
+      return makeAutoblocksLocalTestResultsHtmlUrl({
+        testExternalId: props.testExternalId,
+      });
+    }
+    if (props.ciBranchId) {
+      return makeAutoblocksCITestResultsHtmlUrl({
+        testExternalId: props.testExternalId,
+        branchId: props.ciBranchId,
+      });
+    }
+    return null;
+  })();
+
   return (
     <Box flexDirection="column">
       <Box columnGap={1}>
-        {props.runIsOver ? (
+        {props.runMeta?.ended ? (
           <Text color={testStatusColor}>{testStatusIcon}</Text>
         ) : (
           <Spinner type="dots" />
         )}
         <Text bold={true}>{props.testExternalId}</Text>
-        {/* 
-          GitHub Actions does not respect width=100%, so URLs here typically end up wrapping and breaking the box's border.
-          For CI builds we show a link to the summary page above the box, which should be sufficient for navigating to
-          the test results.
-         */}
-        {!process.env.CI && (
-          <>
-            <Spacer />
-            <Box>
-              <Text color="cyan" dimColor={true}>
-                {makeAutoblocksLocalTestHtmlUrl({
-                  testExternalId: props.testExternalId,
-                })}
-              </Text>
-            </Box>
-          </>
-        )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
-        {props.runIsOver && testStatus === TestRunStatus.NO_RESULTS && (
+        {props.runMeta?.ended && testStatus === TestRunStatus.NO_RESULTS && (
           <Text color="gray">No results.</Text>
         )}
         <Box flexDirection="column">
@@ -175,14 +181,37 @@ function TestRow(props: {
           })}
         </Box>
       </Box>
-      {props.shareUrl && (
-        <Box paddingLeft={2} paddingTop={1}>
-          <Text>Shareable Url: </Text>
-          <Text color="cyan" dimColor={true}>
-            {props.shareUrl}
-          </Text>
-        </Box>
-      )}
+      {/* Links */}
+      <Box flexDirection="column" paddingTop={1} paddingLeft={2}>
+        {resultsUrl && <ExternalLink name="Results" url={resultsUrl} />}
+        {props.runMeta && (
+          <ExternalLink
+            name="Human Review"
+            url={makeAutoblocksHumanReviewHtmlUrl({
+              testExternalId: props.testExternalId,
+              runId: props.runMeta.id,
+            })}
+          />
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+function ExternalLink(props: { name: string; url: string }) {
+  const prefix = '>>';
+  const columnGap = 1;
+  // Hardcode the width so that it doesn't wrap in CI terminals
+  const width = [prefix, props.name, props.url].join(
+    ' '.repeat(columnGap),
+  ).length;
+  return (
+    <Box columnGap={columnGap} width={width}>
+      <Text>{prefix}</Text>
+      <Text>{props.name}</Text>
+      <Text color="cyan" dimColor={true}>
+        {props.url}
+      </Text>
     </Box>
   );
 }
@@ -192,14 +221,8 @@ const App = (props: AppProps) => {
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
   const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
   const [evals, setEvals] = useState<Evaluation[]>([]);
-  const [testIdToRunIsOver, setTestIdToRunIsOver] = useState<
-    Record<
-      string,
-      {
-        ended: boolean;
-        shareUrl: string | undefined;
-      }
-    >
+  const [testIdToRunMeta, setTestIdToRunMeta] = useState<
+    Record<string, RunMeta>
   >({});
 
   useEffect(() => {
@@ -231,10 +254,11 @@ const App = (props: AppProps) => {
     };
 
     const runEndListener = (runEnded: RunEnded) => {
-      setTestIdToRunIsOver((prevRunIsOver) => {
+      setTestIdToRunMeta((prev) => {
         return {
-          ...prevRunIsOver,
+          ...prev,
           [runEnded.testExternalId]: {
+            id: runEnded.id,
             ended: true,
             shareUrl: runEnded.shareUrl,
           },
@@ -258,14 +282,6 @@ const App = (props: AppProps) => {
       emitter.off(EventName.RUN_ENDED, runEndListener);
     };
   }, []);
-
-  const autoblocksCIBuildHtmlUrl =
-    props.ciBranchId && props.ciBuildId
-      ? makeAutoblocksCIBuildHtmlUrl({
-          branchId: props.ciBranchId,
-          buildId: props.ciBuildId,
-        })
-      : undefined;
 
   return (
     <>
@@ -296,24 +312,7 @@ const App = (props: AppProps) => {
         width="100%"
         flexDirection="column"
       >
-        {autoblocksCIBuildHtmlUrl && (
-          // Hardcode the width so that the URL doesn't wrap.
-          <Box width={`View results at ${autoblocksCIBuildHtmlUrl}`.length}>
-            <Text color="gray">View results at</Text>
-            <Space />
-            <Text color="cyan" dimColor={true}>
-              {autoblocksCIBuildHtmlUrl}
-            </Text>
-          </Box>
-        )}
-        <Box
-          paddingX={1}
-          flexDirection="column"
-          borderStyle="round"
-          borderColor="gray"
-          minHeight={12}
-          rowGap={1}
-        >
+        <Box paddingX={1} flexDirection="column" minHeight={12} rowGap={1}>
           {testExternalIds.length === 0 && (
             <Box>
               <Text color="gray">
@@ -323,6 +322,7 @@ const App = (props: AppProps) => {
             </Box>
           )}
           {testExternalIds.map((testExternalId) => {
+            const runMeta = testIdToRunMeta[testExternalId];
             const testEvals = evals.filter(
               (e) => e.testExternalId === testExternalId,
             );
@@ -332,15 +332,27 @@ const App = (props: AppProps) => {
             return (
               <TestRow
                 key={testExternalId}
-                runIsOver={Boolean(testIdToRunIsOver[testExternalId]?.ended)}
-                shareUrl={testIdToRunIsOver[testExternalId]?.shareUrl}
                 testExternalId={testExternalId}
+                ciBranchId={props.ciBranchId}
+                runMeta={runMeta}
                 evals={testEvals}
                 errors={testErrors}
               />
             );
           })}
         </Box>
+      </Box>
+      {/* Links */}
+      <Box flexDirection="column" paddingTop={1}>
+        {props.ciBranchId && props.ciBuildId && (
+          <ExternalLink
+            name="Build Summary"
+            url={makeAutoblocksCIBuildSummaryHtmlUrl({
+              branchId: props.ciBranchId,
+              buildId: props.ciBuildId,
+            })}
+          />
+        )}
       </Box>
     </>
   );

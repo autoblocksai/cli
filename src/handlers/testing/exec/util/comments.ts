@@ -1,7 +1,7 @@
 import type { CIContext } from './ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
 import { type Evaluation, EvaluationPassed, TestRunStatus } from './models';
-import { makeAutoblocksCIBuildHtmlUrl } from './url';
+import { makeAutoblocksCIBuildSummaryHtmlUrl } from './url';
 import github from '@actions/github';
 
 // Commit messages are truncated if they're longer than this
@@ -214,7 +214,7 @@ function makeGitHubComment(args: {
   runDurationMs: number;
   evaluations: Evaluation[];
 }): string {
-  const autoblocksUrl = makeAutoblocksCIBuildHtmlUrl({
+  const autoblocksUrl = makeAutoblocksCIBuildSummaryHtmlUrl({
     branchId: args.branchId,
     buildId: args.buildId,
   });
@@ -298,7 +298,7 @@ function makeSlackMessageBlocks(args: {
             text: 'View in Autoblocks',
             emoji: true,
           },
-          url: makeAutoblocksCIBuildHtmlUrl({
+          url: makeAutoblocksCIBuildSummaryHtmlUrl({
             branchId: args.branchId,
             buildId: args.buildId,
           }),

@@ -190,6 +190,7 @@ export class RunManager {
     });
 
     emitter.emit(EventName.RUN_ENDED, {
+      id: this.currentRunId({ testExternalId: args.testExternalId }),
       testExternalId: args.testExternalId,
       shareUrl,
     });
