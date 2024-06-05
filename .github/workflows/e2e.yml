@@ -14,9 +14,6 @@ on:
   schedule:
     - cron: '17 15 * * *'
 
-env:
-  TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: test
-
 jobs:
   py:
     name: python-e2e-${{ github.event_name }}

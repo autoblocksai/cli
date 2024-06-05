@@ -37,6 +37,7 @@ const zRunStartedSchema = z.object({
 });
 
 const zRunEndedSchema = z.object({
+  id: z.string(),
   testExternalId: z.string(),
   shareUrl: z.string().optional(),
 });
