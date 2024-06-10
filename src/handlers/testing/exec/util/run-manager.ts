@@ -336,6 +336,7 @@ export class RunManager {
   async runUIBasedEvaluators(args: {
     testExternalId: string;
     testCaseId: string;
+    testCaseHash: string;
   }) {
     const runId = this.currentRunId({
       testExternalId: args.testExternalId,
@@ -350,7 +351,7 @@ export class RunManager {
       this.evaluations.push({
         testExternalId: args.testExternalId,
         evaluatorExternalId: result.evaluatorExternalId,
-        testCaseHash: args.testCaseId,
+        testCaseHash: args.testCaseHash,
         passed: result.passed ? EvaluationPassed.TRUE : EvaluationPassed.FALSE,
       });
     });
@@ -405,6 +406,7 @@ export class RunManager {
     await this.runUIBasedEvaluators({
       testExternalId: args.testExternalId,
       testCaseId: resultId,
+      testCaseHash: args.testCaseHash,
     });
   }
 
