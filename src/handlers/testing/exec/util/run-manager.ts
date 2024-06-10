@@ -50,11 +50,6 @@ export class RunManager {
   private evaluations: Evaluation[];
 
   /**
-   * Keep track of UI based evaluations
-   */
-  private uiBasedEvaluations: Evaluation[];
-
-  /**
    * The CI context, parsed from environment variables and local git data.
    */
   private ciContext: CIContext | undefined;
@@ -82,7 +77,6 @@ export class RunManager {
     this.testCaseEvents = [];
     this.uncaughtErrors = [];
     this.evaluations = [];
-    this.uiBasedEvaluations = [];
   }
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
@@ -354,12 +348,14 @@ export class RunManager {
       }[];
     }>(`/runs/${runId}/results/${args.testCaseId}/ui-based-evaluations`);
     evaluationResults.forEach((result) => {
-      this.uiBasedEvaluations.push({
+      const evaluation = {
         testExternalId: args.testExternalId,
         evaluatorExternalId: result.evaluatorExternalId,
         testCaseHash: args.testCaseHash,
         passed: result.passed ? EvaluationPassed.TRUE : EvaluationPassed.FALSE,
-      });
+      };
+      emitter.emit(EventName.EVALUATION, evaluation);
+      this.evaluations.push(evaluation);
     });
   }
 
