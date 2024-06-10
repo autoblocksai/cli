@@ -333,6 +333,32 @@ export class RunManager {
     this.uncaughtErrors.push(args);
   }
 
+  async runUIBasedEvaluators(args: {
+    testExternalId: string;
+    testCaseId: string;
+    testCaseHash: string;
+  }) {
+    const runId = this.currentRunId({
+      testExternalId: args.testExternalId,
+    });
+    const { evaluationResults } = await this.post<{
+      evaluationResults: {
+        evaluatorExternalId: string;
+        passed: boolean;
+      }[];
+    }>(`/runs/${runId}/results/${args.testCaseId}/ui-based-evaluations`);
+    evaluationResults.forEach((result) => {
+      const evaluation = {
+        testExternalId: args.testExternalId,
+        evaluatorExternalId: result.evaluatorExternalId,
+        testCaseHash: args.testCaseHash,
+        passed: result.passed ? EvaluationPassed.TRUE : EvaluationPassed.FALSE,
+      };
+      emitter.emit(EventName.EVALUATION, evaluation);
+      this.evaluations.push(evaluation);
+    });
+  }
+
   async handleTestCaseResult(args: {
     testExternalId: string;
     testCaseHash: string;
@@ -378,6 +404,12 @@ export class RunManager {
     }
     this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
       resultId;
+
+    await this.runUIBasedEvaluators({
+      testExternalId: args.testExternalId,
+      testCaseId: resultId,
+      testCaseHash: args.testCaseHash,
+    });
   }
 
   private determineIfEvaluationPassed(args: {
