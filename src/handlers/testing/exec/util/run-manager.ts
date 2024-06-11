@@ -89,7 +89,15 @@ export class RunManager {
         Authorization: `Bearer ${this.apiKey}`,
       },
     });
-    const data = await resp.json();
+
+    let data;
+    try {
+      data = await resp.json();
+    } catch {
+      const text = await resp.text();
+      throw new Error(`Failed to parse response: ${text}`);
+    }
+
     if (!resp.ok) {
       // Our API returns errors formated at JSON, so just throw
       // the stringified JSON
