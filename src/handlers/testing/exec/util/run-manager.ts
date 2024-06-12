@@ -417,18 +417,27 @@ export class RunManager {
         testCaseRevisionUsage: args.testCaseRevisionUsage,
       },
     );
+
+    if (!this.testCaseHashToResultId[args.testExternalId]) {
+      this.testCaseHashToResultId[args.testExternalId] = {};
+    }
+    this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
+      resultId;
+
+    // We still want to try the other endpoints if 1 fails
+    await Promise.allSettled([
+      this.post(`/runs/${runId}/results/${resultId}/body`, {
+        testCaseBody: args.testCaseBody,
+      }),
+      this.post(`/runs/${runId}/results/${resultId}/output`, {
+        testCaseOutput: args.testCaseOutput,
+      }),
+      this.post(`/runs/${runId}/results/${resultId}/events`, {
+        testCaseEvents: events,
+      }),
+    ]);
+
     try {
-      await Promise.all([
-        this.post(`/runs/${runId}/results/${resultId}/body`, {
-          testCaseBody: args.testCaseBody,
-        }),
-        this.post(`/runs/${runId}/results/${resultId}/output`, {
-          testCaseOutput: args.testCaseOutput,
-        }),
-        this.post(`/runs/${runId}/results/${resultId}/events`, {
-          testCaseEvents: events,
-        }),
-      ]);
       // Important that this is after we send in the body and output
       // that way we can infer human review fields from the body and output
       // if they weren't set by the user
@@ -439,21 +448,16 @@ export class RunManager {
           testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
         },
       );
+      // Important that this is after human review fields since it uses them
+      // If human review fields fails, we don't want to run this
+      await this.runUIBasedEvaluators({
+        testExternalId: args.testExternalId,
+        testCaseId: resultId,
+        testCaseHash: args.testCaseHash,
+      });
     } catch {
-      // Do nothing since this will just show up as some empty data in the UI
+      // do nothing if this fails because it's not critical
     }
-
-    if (!this.testCaseHashToResultId[args.testExternalId]) {
-      this.testCaseHashToResultId[args.testExternalId] = {};
-    }
-    this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
-      resultId;
-
-    await this.runUIBasedEvaluators({
-      testExternalId: args.testExternalId,
-      testCaseId: resultId,
-      testCaseHash: args.testCaseHash,
-    });
   }
 
   private determineIfEvaluationPassed(args: {
