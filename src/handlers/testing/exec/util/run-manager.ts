@@ -408,45 +408,39 @@ export class RunManager {
     const runId = this.currentRunId({
       testExternalId: args.testExternalId,
     });
-    const payload = {
-      testCaseHash: args.testCaseHash,
-      testCaseBody: args.testCaseBody,
-      testCaseOutput: args.testCaseOutput,
-      testCaseEvents: events,
-      testCaseDurationMs: args.testCaseDurationMs,
-      testCaseRevisionUsage: args.testCaseRevisionUsage,
-      testCaseHumanReviewInputFields: args.testCaseHumanReviewInputFields,
-      testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
-    } as const;
 
-    let resultId: string;
+    const { id: resultId } = await this.post<{ id: string }>(
+      `/runs/${runId}/results`,
+      {
+        testCaseHash: args.testCaseHash,
+        testCaseDurationMs: args.testCaseDurationMs,
+        testCaseRevisionUsage: args.testCaseRevisionUsage,
+      },
+    );
     try {
-      const { id } = await this.post<{ id: string }>(
-        `/runs/${runId}/results`,
-        payload,
+      await Promise.all([
+        this.post(`/runs/${runId}/results/${resultId}/body`, {
+          testCaseBody: args.testCaseBody,
+        }),
+        this.post(`/runs/${runId}/results/${resultId}/output`, {
+          testCaseOutput: args.testCaseOutput,
+        }),
+        this.post(`/runs/${runId}/results/${resultId}/events`, {
+          testCaseEvents: events,
+        }),
+      ]);
+      // Important that this is after we send in the body and output
+      // that way we can infer human review fields from the body and output
+      // if they weren't set by the user
+      await this.post(
+        `/runs/${runId}/results/${resultId}/human-review-fields`,
+        {
+          testCaseHumanReviewInputFields: args.testCaseHumanReviewInputFields,
+          testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
+        },
       );
-      resultId = id;
-    } catch (err) {
-      try {
-        const parsedError = zHttpError.parse(
-          JSON.parse((err as Error).message),
-        );
-        if (parsedError.status === 413) {
-          // If the /results request fails with a content too large error, retry with an empty output
-          const { id } = await this.post<{ id: string }>(
-            `/runs/${runId}/results`,
-            {
-              ...payload,
-              testCaseOutput: '',
-            },
-          );
-          resultId = id;
-        } else {
-          throw err;
-        }
-      } catch {
-        throw err;
-      }
+    } catch {
+      // Do nothing since this will just show up as some empty data in the UI
     }
 
     if (!this.testCaseHashToResultId[args.testExternalId]) {
