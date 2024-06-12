@@ -398,13 +398,6 @@ export class RunManager {
     testCaseHumanReviewInputFields?: { name: string; value: string }[] | null;
     testCaseHumanReviewOutputFields?: { name: string; value: string }[] | null;
   }) {
-    const events = this.testCaseEvents
-      .filter(
-        (e) =>
-          e.testExternalId === args.testExternalId &&
-          e.testCaseHash === args.testCaseHash,
-      )
-      .map((e) => e.event);
     const runId = this.currentRunId({
       testExternalId: args.testExternalId,
     });
@@ -424,8 +417,16 @@ export class RunManager {
     this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
       resultId;
 
+    const events = this.testCaseEvents
+      .filter(
+        (e) =>
+          e.testExternalId === args.testExternalId &&
+          e.testCaseHash === args.testCaseHash,
+      )
+      .map((e) => e.event);
+
     // We still want to try the other endpoints if 1 fails
-    await Promise.allSettled([
+    const results = await Promise.allSettled([
       this.post(`/runs/${runId}/results/${resultId}/body`, {
         testCaseBody: args.testCaseBody,
       }),
@@ -436,6 +437,16 @@ export class RunManager {
         testCaseEvents: events,
       }),
     ]);
+
+    results.forEach((result) => {
+      if (result.status === 'rejected') {
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'warn',
+          message: `Failed to send part of the test case results to Autoblocks for test case hash ${args.testCaseHash}: ${result.reason}`,
+        });
+      }
+    });
 
     try {
       // Important that this is after we send in the body and output
@@ -448,6 +459,15 @@ export class RunManager {
           testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
         },
       );
+    } catch (err) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'warn',
+        message: `Failed to send human review fields to Autoblocks for test case hash ${args.testCaseHash}: ${err}`,
+      });
+    }
+
+    try {
       // Important that this is after human review fields since it uses them
       // If human review fields fails, we don't want to run this
       await this.runUIBasedEvaluators({
@@ -455,8 +475,12 @@ export class RunManager {
         testCaseId: resultId,
         testCaseHash: args.testCaseHash,
       });
-    } catch {
-      // do nothing if this fails because it's not critical
+    } catch (err) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'warn',
+        message: `Failed to run AI evaluators created on the Autoblocks UI for test case hash ${args.testCaseHash}: ${err}`,
+      });
     }
   }
 
