@@ -7,6 +7,14 @@ import {
   EvaluationPassed,
 } from './models';
 import { postSlackMessage, postGitHubComment } from './comments';
+import { z } from 'zod';
+
+const zHttpError = z.object({
+  status: z.number(),
+  data: z.unknown(),
+});
+
+type HttpError = z.infer<typeof zHttpError>;
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 
@@ -95,13 +103,19 @@ export class RunManager {
       data = await resp.json();
     } catch {
       const text = await resp.text();
-      throw new Error(`Failed to parse response: ${text}`);
+      const err: HttpError = {
+        status: resp.status,
+        data: text,
+      };
+      throw new Error(JSON.stringify(err));
     }
 
     if (!resp.ok) {
-      // Our API returns errors formated at JSON, so just throw
-      // the stringified JSON
-      throw new Error(JSON.stringify(data));
+      const err: HttpError = {
+        status: resp.status,
+        data,
+      };
+      throw new Error(JSON.stringify(err));
     }
     return data;
   }
@@ -394,19 +408,47 @@ export class RunManager {
     const runId = this.currentRunId({
       testExternalId: args.testExternalId,
     });
-    const { id: resultId } = await this.post<{ id: string }>(
-      `/runs/${runId}/results`,
-      {
-        testCaseHash: args.testCaseHash,
-        testCaseBody: args.testCaseBody,
-        testCaseOutput: args.testCaseOutput,
-        testCaseEvents: events,
-        testCaseDurationMs: args.testCaseDurationMs,
-        testCaseRevisionUsage: args.testCaseRevisionUsage,
-        testCaseHumanReviewInputFields: args.testCaseHumanReviewInputFields,
-        testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
-      },
-    );
+    const payload = {
+      testCaseHash: args.testCaseHash,
+      testCaseBody: args.testCaseBody,
+      testCaseOutput: args.testCaseOutput,
+      testCaseEvents: events,
+      testCaseDurationMs: args.testCaseDurationMs,
+      testCaseRevisionUsage: args.testCaseRevisionUsage,
+      testCaseHumanReviewInputFields: args.testCaseHumanReviewInputFields,
+      testCaseHumanReviewOutputFields: args.testCaseHumanReviewOutputFields,
+    } as const;
+
+    let resultId: string;
+    try {
+      const { id } = await this.post<{ id: string }>(
+        `/runs/${runId}/results`,
+        payload,
+      );
+      resultId = id;
+    } catch (err) {
+      try {
+        const parsedError = zHttpError.parse(
+          JSON.parse((err as Error).message),
+        );
+        if (parsedError.status === 413) {
+          // If the /results request fails with a content too large error, retry with an empty output
+          const { id } = await this.post<{ id: string }>(
+            `/runs/${runId}/results`,
+            {
+              ...payload,
+              testCaseOutput: '',
+            },
+          );
+          resultId = id;
+        } else {
+          throw err;
+        }
+      } catch {
+        throw err;
+      }
+    }
+
     if (!this.testCaseHashToResultId[args.testExternalId]) {
       this.testCaseHashToResultId[args.testExternalId] = {};
     }
