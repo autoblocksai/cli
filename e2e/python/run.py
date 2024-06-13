@@ -50,6 +50,8 @@ class IsFriendly(BaseTestEvaluator):
 
     async def evaluate_test_case(self, test_case: BaseTestCase, output: str) -> Evaluation:
         score = await self.get_score(output)
+        if random.random() > 0.8:
+            return None
         return Evaluation(
             score=score,
         )
