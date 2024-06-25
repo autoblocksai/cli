@@ -98,6 +98,15 @@ export class RunManager {
       },
     });
 
+    emitter.emit(EventName.CONSOLE_LOG, {
+      ctx: 'cli',
+      level: 'debug',
+      message: JSON.stringify({
+        path: `${AUTOBLOCKS_API_BASE_URL}${subpath}${path}`,
+        body,
+      }),
+    });
+
     let data;
     try {
       data = await resp.json();
