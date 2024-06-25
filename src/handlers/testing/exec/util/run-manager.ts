@@ -38,7 +38,7 @@ export class RunManager {
   /**
    * Keep a map of test case hashes to their result IDs
    *
-   * testExternalId -> testCaseHash -> testCaseResultId
+   * runId -> testCaseHash -> testCaseResultId
    */
   private testCaseHashToResultId: Record<string, Record<string, string>>;
 
@@ -290,11 +290,11 @@ export class RunManager {
   }
 
   private testCaseResultIdFromHash(args: {
-    testExternalId: string;
+    runId: string;
     testCaseHash: string;
   }): string {
     const testCaseResultId =
-      this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
+      this.testCaseHashToResultId[args.runId]?.[args.testCaseHash];
     if (!testCaseResultId) {
       throw new Error(
         `No corresponding test case result ID for test case hash ${args.testCaseHash}`,
@@ -370,7 +370,10 @@ export class RunManager {
         try {
           debugLines.push(
             `Test Case Result ID: ${this.testCaseResultIdFromHash({
-              testExternalId: args.testExternalId,
+              runId: this.legacyGetCurrentRunId({
+                testExternalId: args.testExternalId,
+                runId: args.runId,
+              }),
               testCaseHash: args.testCaseHash,
             })}`,
           );
@@ -466,11 +469,10 @@ export class RunManager {
       },
     );
 
-    if (!this.testCaseHashToResultId[args.testExternalId]) {
-      this.testCaseHashToResultId[args.testExternalId] = {};
+    if (!this.testCaseHashToResultId[runId]) {
+      this.testCaseHashToResultId[runId] = {};
     }
-    this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
-      resultId;
+    this.testCaseHashToResultId[runId][args.testCaseHash] = resultId;
 
     const events = this.testCaseEvents
       .filter(
@@ -615,7 +617,7 @@ export class RunManager {
     });
 
     const testCaseResultId = this.testCaseResultIdFromHash({
-      testExternalId: args.testExternalId,
+      runId,
       testCaseHash: args.testCaseHash,
     });
 
