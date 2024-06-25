@@ -209,7 +209,6 @@ function ExternalLink(props: { name: string; url: string }) {
 function GridSearchParamsCombo(props: { params: Record<string, unknown> }) {
   return (
     <Box columnGap={1}>
-      <Text color="gray">{'|'}</Text>
       {Object.entries(props.params).map(([key, value]) => {
         return (
           <Box key={key}>
