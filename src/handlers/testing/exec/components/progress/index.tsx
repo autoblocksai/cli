@@ -128,9 +128,7 @@ function TestRunRow(props: {
         )}
         <Text bold={true}>{props.runMeta.testExternalId}</Text>
         {props.runMeta.gridSearchParamsCombo && (
-          <Text color="gray">
-            {JSON.stringify(props.runMeta.gridSearchParamsCombo)}
-          </Text>
+          <GridSearchParamsCombo params={props.runMeta.gridSearchParamsCombo} />
         )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
@@ -204,6 +202,25 @@ function ExternalLink(props: { name: string; url: string }) {
       <Text color="cyan" dimColor={true}>
         {props.url}
       </Text>
+    </Box>
+  );
+}
+
+function GridSearchParamsCombo(props: { params: Record<string, unknown> }) {
+  return (
+    <Box columnGap={1}>
+      <Text color="gray">{'|'}</Text>
+      {Object.entries(props.params).map(([key, value]) => {
+        return (
+          <Box key={key}>
+            <Text color="gray">
+              {key}
+              {'='}
+            </Text>
+            <Text color="cyan">{JSON.stringify(value)}</Text>
+          </Box>
+        );
+      })}
     </Box>
   );
 }
