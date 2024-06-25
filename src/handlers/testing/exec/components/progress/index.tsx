@@ -12,7 +12,6 @@ import {
 } from '../../util/url';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
-type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 type Evaluation = EventSchemas[EventName.EVALUATION];
 type RunStarted = EventSchemas[EventName.RUN_STARTED];
 type RunEnded = EventSchemas[EventName.RUN_ENDED];
@@ -25,8 +24,10 @@ interface AppProps {
 
 interface RunMeta {
   id: string;
+  testExternalId: string;
   ended: boolean;
   shareUrl: string | undefined;
+  gridSearchParamsCombo: Record<string, unknown> | undefined;
 }
 
 const MAX_TEST_CASES = 100;
@@ -80,12 +81,10 @@ function makeColorFromLogLevel(
   }
 }
 
-function TestRow(props: {
-  testExternalId: string;
+function TestRunRow(props: {
   ciBranchId: string | undefined;
-  runMeta: RunMeta | undefined;
+  runMeta: RunMeta;
   evals: Evaluation[];
-  errors: UncaughtError[];
 }) {
   const uniqEvaluatorExternalIds = uniq(
     props.evals.map((e) => e.evaluatorExternalId),
@@ -107,12 +106,12 @@ function TestRow(props: {
   const resultsUrl: string | null = (() => {
     if (!process.env.CI) {
       return makeAutoblocksLocalTestResultsHtmlUrl({
-        testExternalId: props.testExternalId,
+        testExternalId: props.runMeta.testExternalId,
       });
     }
     if (props.ciBranchId) {
       return makeAutoblocksCITestResultsHtmlUrl({
-        testExternalId: props.testExternalId,
+        testExternalId: props.runMeta.testExternalId,
         branchId: props.ciBranchId,
       });
     }
@@ -122,15 +121,20 @@ function TestRow(props: {
   return (
     <Box flexDirection="column">
       <Box columnGap={1}>
-        {props.runMeta?.ended ? (
+        {props.runMeta.ended ? (
           <Text color={testStatusColor}>{testStatusIcon}</Text>
         ) : (
           <Spinner type="dots" />
         )}
-        <Text bold={true}>{props.testExternalId}</Text>
+        <Text bold={true}>{props.runMeta.testExternalId}</Text>
+        {props.runMeta.gridSearchParamsCombo && (
+          <Text color="gray">
+            {JSON.stringify(props.runMeta.gridSearchParamsCombo)}
+          </Text>
+        )}
       </Box>
       <Box paddingLeft={2} columnGap={2}>
-        {props.runMeta?.ended && testStatus === TestRunStatus.NO_RESULTS && (
+        {props.runMeta.ended && testStatus === TestRunStatus.NO_RESULTS && (
           <Text color="gray">No results.</Text>
         )}
         <Box flexDirection="column">
@@ -157,20 +161,10 @@ function TestRow(props: {
                           e.evaluatorExternalId === evaluatorExternalId &&
                           e.testCaseHash === testCaseHash,
                       )?.passed;
-                    const hasUncaughtError = props.errors.some(
-                      (e) =>
-                        e.testCaseHash === testCaseHash &&
-                        (e.evaluatorExternalId === evaluatorExternalId ||
-                          e.evaluatorExternalId === undefined),
-                    );
                     return (
                       <Text
                         key={testCaseHash}
-                        color={
-                          hasUncaughtError
-                            ? 'white'
-                            : makeColorFromEvaluationPassed(passed)
-                        }
+                        color={makeColorFromEvaluationPassed(passed)}
                       >
                         {'.'}
                       </Text>
@@ -184,15 +178,13 @@ function TestRow(props: {
       {/* Links */}
       <Box flexDirection="column" paddingTop={1} paddingLeft={2}>
         {resultsUrl && <ExternalLink name="Results" url={resultsUrl} />}
-        {props.runMeta && (
-          <ExternalLink
-            name="Human Review"
-            url={makeAutoblocksHumanReviewHtmlUrl({
-              testExternalId: props.testExternalId,
-              runId: props.runMeta.id,
-            })}
-          />
-        )}
+        <ExternalLink
+          name="Human Review"
+          url={makeAutoblocksHumanReviewHtmlUrl({
+            testExternalId: props.runMeta.testExternalId,
+            runId: props.runMeta.id,
+          })}
+        />
       </Box>
     </Box>
   );
@@ -217,24 +209,14 @@ function ExternalLink(props: { name: string; url: string }) {
 }
 
 const App = (props: AppProps) => {
-  const [testExternalIds, setTestExternalIds] = useState<string[]>([]);
   const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
-  const [uncaughtErrors, setUncaughtErrors] = useState<UncaughtError[]>([]);
   const [evals, setEvals] = useState<Evaluation[]>([]);
-  const [testIdToRunMeta, setTestIdToRunMeta] = useState<
-    Record<string, RunMeta>
-  >({});
+  const [runMetas, setRunMetas] = useState<RunMeta[]>([]);
 
   useEffect(() => {
     const consoleLogListener = (log: ConsoleLog) => {
       setConsoleLogs((prevLogs) => {
         return [...prevLogs, log];
-      });
-    };
-
-    const uncaughtErrorListener = (error: UncaughtError) => {
-      setUncaughtErrors((prevErrors) => {
-        return [...prevErrors, error];
       });
     };
 
@@ -245,29 +227,36 @@ const App = (props: AppProps) => {
     };
 
     const runStartListener = (runStarted: RunStarted) => {
-      setTestExternalIds((prevIds) => {
+      setRunMetas((prev) => {
         return [
-          ...prevIds.filter((id) => id !== runStarted.testExternalId),
-          runStarted.testExternalId,
+          ...prev,
+          {
+            id: runStarted.id,
+            testExternalId: runStarted.testExternalId,
+            ended: false,
+            shareUrl: undefined,
+            gridSearchParamsCombo: runStarted.gridSearchParamsCombo,
+          },
         ];
       });
     };
 
     const runEndListener = (runEnded: RunEnded) => {
-      setTestIdToRunMeta((prev) => {
-        return {
-          ...prev,
-          [runEnded.testExternalId]: {
-            id: runEnded.id,
-            ended: true,
-            shareUrl: runEnded.shareUrl,
-          },
-        };
+      setRunMetas((prev) => {
+        return prev.map((runMeta) => {
+          if (runMeta.id === runEnded.id) {
+            return {
+              ...runMeta,
+              ended: true,
+              shareUrl: runEnded.shareUrl,
+            };
+          }
+          return runMeta;
+        });
       });
     };
 
     emitter.on(EventName.CONSOLE_LOG, consoleLogListener);
-    emitter.on(EventName.UNCAUGHT_ERROR, uncaughtErrorListener);
     emitter.on(EventName.EVALUATION, evalListener);
     emitter.on(EventName.RUN_STARTED, runStartListener);
     emitter.on(EventName.RUN_ENDED, runEndListener);
@@ -276,7 +265,6 @@ const App = (props: AppProps) => {
 
     return () => {
       emitter.off(EventName.CONSOLE_LOG, consoleLogListener);
-      emitter.off(EventName.UNCAUGHT_ERROR, uncaughtErrorListener);
       emitter.off(EventName.EVALUATION, evalListener);
       emitter.off(EventName.RUN_STARTED, runStartListener);
       emitter.off(EventName.RUN_ENDED, runEndListener);
@@ -313,7 +301,7 @@ const App = (props: AppProps) => {
         flexDirection="column"
       >
         <Box paddingX={1} flexDirection="column" minHeight={12} rowGap={1}>
-          {testExternalIds.length === 0 && (
+          {runMetas.length === 0 && (
             <Box>
               <Text color="gray">
                 Waiting for test results
@@ -321,22 +309,13 @@ const App = (props: AppProps) => {
               </Text>
             </Box>
           )}
-          {testExternalIds.map((testExternalId) => {
-            const runMeta = testIdToRunMeta[testExternalId];
-            const testEvals = evals.filter(
-              (e) => e.testExternalId === testExternalId,
-            );
-            const testErrors = uncaughtErrors.filter(
-              (e) => e.testExternalId === testExternalId,
-            );
+          {runMetas.map((runMeta) => {
             return (
-              <TestRow
-                key={testExternalId}
-                testExternalId={testExternalId}
+              <TestRunRow
+                key={runMeta.id}
                 ciBranchId={props.ciBranchId}
                 runMeta={runMeta}
-                evals={testEvals}
-                errors={testErrors}
+                evals={evals.filter((e) => e.runId === runMeta.id)}
               />
             );
           })}

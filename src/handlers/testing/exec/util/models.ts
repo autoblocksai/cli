@@ -14,6 +14,7 @@ export enum EvaluationPassed {
 
 export interface TestCaseEvent {
   testExternalId: string;
+  runId: string;
   testCaseHash: string;
   event: {
     message: string;
@@ -25,6 +26,7 @@ export interface TestCaseEvent {
 
 export const zEvaluationSchema = z.object({
   testExternalId: z.string(),
+  runId: z.string(),
   evaluatorExternalId: z.string(),
   testCaseHash: z.string(),
   passed: z.nativeEnum(EvaluationPassed),

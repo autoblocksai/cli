@@ -21,6 +21,7 @@ const zConsoleLogSchema = z.object({
 
 const zUncaughtErrorSchema = z.object({
   testExternalId: z.string().optional(),
+  runId: z.string().optional(),
   // Will be defined if the error occurred within a certain test case
   testCaseHash: z.string().optional(),
   // Will be defined if the error occurred within a certain evaluator
@@ -33,7 +34,9 @@ const zUncaughtErrorSchema = z.object({
 });
 
 const zRunStartedSchema = z.object({
+  id: z.string(),
   testExternalId: z.string(),
+  gridSearchParamsCombo: z.record(z.string(), z.unknown()).optional(),
 });
 
 const zRunEndedSchema = z.object({

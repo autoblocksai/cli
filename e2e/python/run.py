@@ -8,6 +8,7 @@ from autoblocks.testing.models import BaseTestEvaluator
 from autoblocks.testing.models import Evaluation
 from autoblocks.testing.models import Threshold
 from autoblocks.testing.util import md5
+from autoblocks.testing.run import grid_search_ctx
 from autoblocks.testing.run import run_test_suite
 
 
@@ -26,6 +27,9 @@ async def test_fn(test_case: MyTestCase) -> str:
     substrings = test_case.input.split("-")
     if random.random() < 0.2:
         substrings.pop()
+        ctx = grid_search_ctx()
+        if ctx is not None:
+          substrings.append(f"-{ctx['x']}-{ctx['y']}")
 
     return "-".join(substrings)
 
@@ -79,6 +83,10 @@ if __name__ == "__main__":
           HasAllSubstrings(),
           IsFriendly(),
       ],
+      grid_search_params=dict(
+          x=["x1", "x2"],
+          y=["y1"],
+      ),
   )
   run_test_suite(
       id="python-e2e-test-suite-2",
