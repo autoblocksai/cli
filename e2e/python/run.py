@@ -78,7 +78,7 @@ if __name__ == "__main__":
   run_test_suite(
       id="python-e2e-test-suite-1",
       fn=test_fn,
-      test_cases=gen_test_cases(2),
+      test_cases=gen_test_cases(4),
       evaluators=[
           HasAllSubstrings(),
           IsFriendly(),
@@ -88,12 +88,12 @@ if __name__ == "__main__":
           y=["y1"],
       ),
   )
-  # run_test_suite(
-  #     id="python-e2e-test-suite-2",
-  #     fn=test_fn,
-  #     test_cases=gen_test_cases(10),
-  #     evaluators=[
-  #         HasAllSubstrings(),
-  #         IsFriendly(),
-  #     ],
-  # )
+  run_test_suite(
+      id="python-e2e-test-suite-2",
+      fn=test_fn,
+      test_cases=gen_test_cases(10),
+      evaluators=[
+          HasAllSubstrings(),
+          IsFriendly(),
+      ],
+  )
