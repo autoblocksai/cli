@@ -1,6 +1,7 @@
 import { Box, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
+import { uniq } from 'lodash';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
@@ -31,17 +32,6 @@ interface RunMeta {
 }
 
 const MAX_TEST_CASES = 100;
-
-/**
- * Uses add() to ensure that the list is ordered by insertion order
- *
- * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set
- */
-function uniq(vals: string[]): string[] {
-  const set = new Set<string>();
-  vals.forEach((val) => set.add(val));
-  return Array.from(set);
-}
 
 const Space = () => <Text> </Text>;
 

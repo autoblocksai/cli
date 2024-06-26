@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export interface TestRun {
+  startedAt: string;
+  endedAt: string | undefined;
+  runId: string;
+  testExternalId: string;
+  gridSearchParamsCombo: Record<string, unknown> | undefined;
+}
+
 export enum TestRunStatus {
   PASSED = 'PASSED',
   FAILED = 'FAILED',

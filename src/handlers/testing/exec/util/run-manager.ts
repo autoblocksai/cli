@@ -5,6 +5,7 @@ import {
   type TestCaseEvent,
   type Evaluation,
   EvaluationPassed,
+  type TestRun,
 } from './models';
 import { postSlackMessage, postGitHubComment } from './comments';
 import { z } from 'zod';
@@ -29,9 +30,16 @@ export class RunManager {
   private endTime: Date | undefined = undefined;
 
   /**
+   * Map of run ID to run metadata
+   */
+  private runs: Record<string, TestRun>;
+
+  /**
    * Keep a map of each test's external ID to its run ID
    *
    * (we create a run for each test)
+   *
+   * TODO drop this once runId is being sent by the SDKs to each endpoint
    */
   private testExternalIdToRunId: Record<string, string>;
 
@@ -80,6 +88,7 @@ export class RunManager {
     this.includeShareUrl = args.includeShareUrl;
     this.startTime = new Date();
 
+    this.runs = {};
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
@@ -205,6 +214,14 @@ export class RunManager {
       gridSearchParamsCombo: args.gridSearchParamsCombo,
     });
 
+    this.runs[id] = {
+      startedAt: new Date().toISOString(),
+      endedAt: undefined,
+      runId: id,
+      testExternalId: args.testExternalId,
+      gridSearchParamsCombo: args.gridSearchParamsCombo || undefined,
+    };
+
     // TODO drop this map once SDKs are updated to pass run ID to every endpoint
     this.testExternalIdToRunId[args.testExternalId] = id;
 
@@ -242,6 +259,7 @@ export class RunManager {
       await this.post(`/runs/${runId}/end`);
     } finally {
       delete this.testExternalIdToRunId[args.testExternalId];
+      this.runs[runId].endedAt = new Date().toISOString();
     }
   }
 
@@ -251,11 +269,14 @@ export class RunManager {
    */
   async endAllRuns() {
     await Promise.allSettled(
-      Object.entries(this.testExternalIdToRunId).map(
-        ([testExternalId, runId]) => {
-          return this.handleEndRun({ testExternalId, runId });
-        },
-      ),
+      Object.values(this.runs)
+        .filter((r) => !r.endedAt)
+        .map((r) =>
+          this.handleEndRun({
+            testExternalId: r.testExternalId,
+            runId: r.runId,
+          }),
+        ),
     );
   }
 
@@ -693,6 +714,7 @@ export class RunManager {
         branchId: this.ciBranchId,
         ciContext: this.ciContext,
         runDurationMs,
+        runs: Object.values(this.runs),
         evaluations: this.evaluations,
       })
         .then(() => {
@@ -719,6 +741,7 @@ export class RunManager {
         branchId: this.ciBranchId,
         ciContext: this.ciContext,
         runDurationMs,
+        runs: Object.values(this.runs),
         evaluations: this.evaluations,
       })
         .then(() => {
