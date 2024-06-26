@@ -8,7 +8,7 @@ import {
 } from './models';
 import { makeAutoblocksCIBuildSummaryHtmlUrl } from './url';
 import github from '@actions/github';
-import { sortBy } from 'lodash';
+import _ from 'lodash';
 
 // Commit messages are truncated if they're longer than this
 const MAX_COMMIT_MESSAGE_LENGTH = 50;
@@ -360,7 +360,7 @@ function makeBuildName(args: {
 
 function sortedRuns(runs: TestRun[]): TestRun[] {
   // Sort by test ID so that runs from the same test suite are grouped together
-  return sortBy(runs, (r) => `${r.testExternalId}-${r.startedAt}`);
+  return _.sortBy(runs, (r) => `${r.testExternalId}-${r.startedAt}`);
 }
 
 function makeStatusHeaderSection(args: {

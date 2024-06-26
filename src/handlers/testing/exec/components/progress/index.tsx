@@ -1,7 +1,7 @@
 import { Box, Static, Text, render } from 'ink';
 import Spinner from 'ink-spinner';
 import { useEffect, useState } from 'react';
-import { uniq } from 'lodash';
+import _ from 'lodash';
 import { EventName, emitter, type EventSchemas } from '../../util/emitter';
 import { makeTestRunStatusFromEvaluations } from '../../util/evals';
 import { EvaluationPassed, TestRunStatus } from '../../util/models';
@@ -76,10 +76,10 @@ function TestRunRow(props: {
   runMeta: RunMeta;
   evals: Evaluation[];
 }) {
-  const uniqEvaluatorExternalIds = uniq(
+  const uniqEvaluatorExternalIds = _.uniq(
     props.evals.map((e) => e.evaluatorExternalId),
   );
-  const uniqTestCaseHashes = uniq(props.evals.map((e) => e.testCaseHash));
+  const uniqTestCaseHashes = _.uniq(props.evals.map((e) => e.testCaseHash));
 
   const testStatus = makeTestRunStatusFromEvaluations(props.evals);
   const statusToColorAndIcon: Record<
