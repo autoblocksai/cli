@@ -447,22 +447,15 @@ function makeSectionsForTestRun(args: {
 
   if (args.run.gridSearchParamsCombo) {
     sections.push({
-      type: 'rich_text',
-      elements: [
-        {
-          type: 'rich_text_section',
-          elements: [
-            {
-              type: 'text',
-              text: `\`${Object.entries(args.run.gridSearchParamsCombo)
-                .map(([key, value]) => {
-                  return `${key} = ${JSON.stringify(value)}`;
-                })
-                .join(' '.repeat(2))}\``,
-            },
-          ],
-        },
-      ],
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `\`${Object.entries(args.run.gridSearchParamsCombo)
+          .map(([key, value]) => {
+            return `${key} = ${JSON.stringify(value)}`;
+          })
+          .join(' '.repeat(2))}\``,
+      },
     });
   }
 
