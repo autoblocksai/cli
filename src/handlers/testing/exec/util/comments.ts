@@ -45,6 +45,9 @@ export async function postSlackMessage(args: {
   runs: TestRun[];
   evaluations: Evaluation[];
 }) {
+  const blocks = makeSlackMessageBlocks(args);
+  // eslint-disable-next-line no-console
+  console.log(blocks);
   const resp = await fetch(args.webhookUrl, {
     method: 'POST',
     headers: {
