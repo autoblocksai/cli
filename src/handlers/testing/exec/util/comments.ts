@@ -414,7 +414,7 @@ function makeAllTestRunSections(args: {
   runs: TestRun[];
   evaluations: Evaluation[];
 }) {
-  return sortedRuns(args.runs).map((run) => {
+  return sortedRuns(args.runs).flatMap((run) => {
     const evaluations = args.evaluations.filter((e) => e.runId === run.runId);
     return makeSectionsForTestRun({ run, evaluations });
   });
