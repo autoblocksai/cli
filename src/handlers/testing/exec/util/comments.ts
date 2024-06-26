@@ -45,9 +45,6 @@ export async function postSlackMessage(args: {
   runs: TestRun[];
   evaluations: Evaluation[];
 }) {
-  const blocks = makeSlackMessageBlocks(args);
-  // eslint-disable-next-line no-console
-  console.log(JSON.stringify(blocks, null, 2));
   const resp = await fetch(args.webhookUrl, {
     method: 'POST',
     headers: {
@@ -437,30 +434,38 @@ function makeSectionsForTestRun(args: {
   const status = makeTestRunStatusFromEvaluations(args.evaluations);
   const statusEmoji = statusToEmoji[status];
 
+  let gridSearchParams = '';
+  if (args.run.gridSearchParamsCombo) {
+    gridSearchParams = `  \`${Object.entries(args.run.gridSearchParamsCombo)
+      .map(([key, value]) => {
+        return `${key} = ${JSON.stringify(value)}`;
+      })
+      .join(' '.repeat(2))}\``;
+  }
+
   const sections: unknown[] = [
     {
       type: 'header',
       text: {
-        type: 'plain_text',
-        text: `${statusEmoji} ${args.run.testExternalId}`,
-        emoji: true,
+        type: 'mrkdwn',
+        text: `${statusEmoji} ${args.run.testExternalId}${gridSearchParams}`,
       },
     },
   ];
 
-  if (args.run.gridSearchParamsCombo) {
-    sections.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `\`${Object.entries(args.run.gridSearchParamsCombo)
-          .map(([key, value]) => {
-            return `${key} = ${JSON.stringify(value)}`;
-          })
-          .join(' '.repeat(2))}\``,
-      },
-    });
-  }
+  // if (args.run.gridSearchParamsCombo) {
+  //   sections.push({
+  //     type: 'section',
+  //     text: {
+  //       type: 'mrkdwn',
+  //       text: `\`${Object.entries(args.run.gridSearchParamsCombo)
+  //         .map(([key, value]) => {
+  //           return `${key} = ${JSON.stringify(value)}`;
+  //         })
+  //         .join(' '.repeat(2))}\``,
+  //     },
+  //   });
+  // }
 
   sections.push({
     type: 'rich_text',
