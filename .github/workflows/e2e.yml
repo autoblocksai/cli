@@ -50,8 +50,8 @@ jobs:
       # we only want to post to Slack on scheduled runs and not on
       # every push or pull request.
       - name: Set Slack webhook URL
-        # if: github.event_name == 'schedule'
-        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.NICOLE_TEST_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+        if: github.event_name == 'schedule'
+        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Run tests in e2e/python
         run: ../../bin/cli.js testing exec -- python3 run.py
@@ -97,8 +97,8 @@ jobs:
       # we only want to post to Slack on scheduled runs and not on
       # every push or pull request.
       - name: Set Slack webhook URL
-        # if: github.event_name == 'schedule'
-        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.NICOLE_TEST_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+        if: github.event_name == 'schedule'
+        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Run tests in e2e/typescript
         run: ../../bin/cli.js testing exec -- npx tsx run.ts
