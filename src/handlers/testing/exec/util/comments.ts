@@ -448,7 +448,7 @@ function makeSectionsForTestRun(args: {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${statusEmoji} **${args.run.testExternalId}**${gridSearchParams}`,
+        text: `${statusEmoji} *${args.run.testExternalId}*${gridSearchParams}`,
       },
     },
   ];
