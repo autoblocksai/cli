@@ -434,38 +434,30 @@ function makeSectionsForTestRun(args: {
   const status = makeTestRunStatusFromEvaluations(args.evaluations);
   const statusEmoji = statusToEmoji[status];
 
-  let gridSearchParams = '';
-  if (args.run.gridSearchParamsCombo) {
-    gridSearchParams = `  \`${Object.entries(args.run.gridSearchParamsCombo)
-      .map(([key, value]) => {
-        return `${key} = ${JSON.stringify(value)}`;
-      })
-      .join(' '.repeat(2))}\``;
-  }
-
   const sections: unknown[] = [
     {
       type: 'section',
       text: {
-        type: 'mrkdwn',
-        text: `${statusEmoji} *${args.run.testExternalId}*${gridSearchParams}`,
+        type: 'plain_text',
+        text: `${statusEmoji} ${args.run.testExternalId}`,
+        emoji: true,
       },
     },
   ];
 
-  // if (args.run.gridSearchParamsCombo) {
-  //   sections.push({
-  //     type: 'section',
-  //     text: {
-  //       type: 'mrkdwn',
-  //       text: `\`${Object.entries(args.run.gridSearchParamsCombo)
-  //         .map(([key, value]) => {
-  //           return `${key} = ${JSON.stringify(value)}`;
-  //         })
-  //         .join(' '.repeat(2))}\``,
-  //     },
-  //   });
-  // }
+  if (args.run.gridSearchParamsCombo) {
+    sections.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `\`${Object.entries(args.run.gridSearchParamsCombo)
+          .map(([key, value]) => {
+            return `${key} = ${JSON.stringify(value)}`;
+          })
+          .join(' '.repeat(2))}\``,
+      },
+    });
+  }
 
   sections.push({
     type: 'rich_text',
