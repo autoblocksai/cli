@@ -445,10 +445,10 @@ function makeSectionsForTestRun(args: {
 
   const sections: unknown[] = [
     {
-      type: 'header',
+      type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `${statusEmoji} ${args.run.testExternalId}${gridSearchParams}`,
+        text: `${statusEmoji} **${args.run.testExternalId}**${gridSearchParams}`,
       },
     },
   ];
