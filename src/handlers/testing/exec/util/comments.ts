@@ -436,7 +436,7 @@ function makeSectionsForTestRun(args: {
 
   const sections: unknown[] = [
     {
-      type: 'section',
+      type: 'header',
       text: {
         type: 'plain_text',
         text: `${statusEmoji} ${args.run.testExternalId}`,
