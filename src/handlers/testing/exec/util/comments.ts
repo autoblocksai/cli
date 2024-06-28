@@ -3,6 +3,7 @@ import { makeTestRunStatusFromEvaluations } from './evals';
 import { type Evaluation, EvaluationPassed, TestRunStatus } from './models';
 import { makeAutoblocksCIBuildSummaryHtmlUrl } from './url';
 import github from '@actions/github';
+import { emitter, EventName } from './emitter';
 
 // Commit messages are truncated if they're longer than this
 const MAX_COMMIT_MESSAGE_LENGTH = 50;
@@ -125,6 +126,7 @@ export async function postGitHubComment(args: {
 }) {
   const api = github.getOctokit(args.githubToken);
   const comment = makeGitHubComment(args);
+  const permissionsDocs = `\nFor more information on how to set up GitHub Actions permissions, see: https://docs.autoblocks.ai/testing/ci#git-hub-comments-git-hub-actions-permissions-advanced`;
 
   // Comment on the pull request if there is an associated pull request number
   // and we're not on the default branch
@@ -142,30 +144,58 @@ export async function postGitHubComment(args: {
     if (existingCommentId !== null) {
       // Update the existing comment on the PR
       try {
-        await api.rest.issues.updateComment({
+        const {
+          data: { html_url },
+        } = await api.rest.issues.updateComment({
           owner: github.context.repo.owner,
           repo: github.context.repo.repo,
           comment_id: existingCommentId,
           body: comment,
         });
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'info',
+          message: `Updated GitHub comment on PR #${args.ciContext.pullRequestNumber}: ${html_url}`,
+        });
         return;
-      } catch {
+      } catch (err) {
         // This will fail if we don't have permission to comment on PRs,
         // so we'll continue to commenting on the commit instead
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'warn',
+          message:
+            `Failed to update GitHub comment on PR #${args.ciContext.pullRequestNumber}: ${err}` +
+            permissionsDocs,
+        });
       }
     } else {
       // Create a new comment on the PR
       try {
-        await api.rest.issues.createComment({
+        const {
+          data: { html_url },
+        } = await api.rest.issues.createComment({
           owner: github.context.repo.owner,
           repo: github.context.repo.repo,
           issue_number: args.ciContext.pullRequestNumber,
           body: comment,
         });
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'info',
+          message: `Created GitHub comment on PR #${args.ciContext.pullRequestNumber}: ${html_url}`,
+        });
         return;
-      } catch {
+      } catch (err) {
         // This will fail if we don't have permission to comment on PRs,
         // so we'll continue to commenting on the commit instead
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'warn',
+          message:
+            `Failed to create GitHub comment on PR #${args.ciContext.pullRequestNumber}: ${err}` +
+            permissionsDocs,
+        });
       }
     }
   }
@@ -177,21 +207,57 @@ export async function postGitHubComment(args: {
   });
   if (existingCommentId !== null) {
     // Update the existing comment on the commit
-    await api.rest.repos.updateCommitComment({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      comment_id: existingCommentId,
-      body: comment,
-    });
-    return;
+    try {
+      const {
+        data: { html_url },
+      } = await api.rest.repos.updateCommitComment({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        comment_id: existingCommentId,
+        body: comment,
+      });
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'info',
+        message: `Updated GitHub comment on commit ${args.ciContext.commitSha}: ${html_url}`,
+      });
+      return;
+    } catch (err) {
+      // This will fail if we don't have permission to comment on commits
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'warn',
+        message:
+          `Failed to update GitHub comment on commit ${args.ciContext.commitSha}: ${err}` +
+          permissionsDocs,
+      });
+    }
   } else {
     // Create a new comment on the commit
-    await api.rest.repos.createCommitComment({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      commit_sha: args.ciContext.commitSha,
-      body: comment,
-    });
+    try {
+      const {
+        data: { html_url },
+      } = await api.rest.repos.createCommitComment({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        commit_sha: args.ciContext.commitSha,
+        body: comment,
+      });
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'info',
+        message: `Created GitHub comment on commit ${args.ciContext.commitSha}: ${html_url}`,
+      });
+    } catch (err) {
+      // This will fail if we don't have permission to comment on commits
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'warn',
+        message:
+          `Failed to create GitHub comment on commit ${args.ciContext.commitSha}: ${err}` +
+          permissionsDocs,
+      });
+    }
   }
 }
 
