@@ -36,6 +36,7 @@ const zUncaughtErrorSchema = z.object({
 const zRunStartedSchema = z.object({
   id: z.string(),
   testExternalId: z.string(),
+  gridSearchRunGroupId: z.string().optional(),
   gridSearchParamsCombo: z.record(z.string(), z.unknown()).optional(),
 });
 

@@ -202,8 +202,18 @@ export class RunManager {
     return this.ciBuildId;
   }
 
+  async handleCreateGrid(args: {
+    gridSearchParams: Record<string, unknown[]>;
+  }): Promise<string> {
+    const { id } = await this.post<{ id: string }>('/grids', {
+      gridSearchParams: args.gridSearchParams,
+    });
+    return id;
+  }
+
   async handleStartRun(args: {
     testExternalId: string;
+    gridSearchRunGroupId?: string;
     gridSearchParamsCombo?: Record<string, unknown> | null;
   }): Promise<string> {
     // Create the run
@@ -229,6 +239,7 @@ export class RunManager {
     emitter.emit(EventName.RUN_STARTED, {
       id,
       testExternalId: args.testExternalId,
+      gridSearchRunGroupId: args.gridSearchRunGroupId,
       gridSearchParamsCombo: args.gridSearchParamsCombo || undefined,
     });
 

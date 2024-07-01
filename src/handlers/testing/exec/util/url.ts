@@ -36,3 +36,15 @@ export function makeAutoblocksHumanReviewHtmlUrl(args: {
   const runId = encodeURIComponent(args.runId);
   return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/test/${testId}/run/${runId}/human-review`;
 }
+
+/**
+ * Links to a group of runs from a grid search.
+ */
+export function makeAutoblocksGridSearchRunGroupHtmlUrl(args: {
+  testExternalId: string;
+  gridSearchRunGroupId: string;
+}): string {
+  const testId = encodeURIComponent(args.testExternalId);
+  const gridId = encodeURIComponent(args.gridSearchRunGroupId);
+  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/test/${testId}/grid/${gridId}`;
+}

@@ -10,6 +10,7 @@ import {
   makeAutoblocksLocalTestResultsHtmlUrl,
   makeAutoblocksCITestResultsHtmlUrl,
   makeAutoblocksHumanReviewHtmlUrl,
+  makeAutoblocksGridSearchRunGroupHtmlUrl,
 } from '../../util/url';
 
 type ConsoleLog = EventSchemas[EventName.CONSOLE_LOG];
@@ -28,6 +29,7 @@ interface RunMeta {
   testExternalId: string;
   ended: boolean;
   shareUrl: string | undefined;
+  gridSearchRunGroupId: string | undefined;
   gridSearchParamsCombo: Record<string, unknown> | undefined;
 }
 
@@ -173,6 +175,15 @@ function TestRunRow(props: {
             runId: props.runMeta.id,
           })}
         />
+        {props.runMeta.gridSearchRunGroupId && (
+          <ExternalLink
+            name="Grid Search"
+            url={makeAutoblocksGridSearchRunGroupHtmlUrl({
+              testExternalId: props.runMeta.testExternalId,
+              gridSearchRunGroupId: props.runMeta.gridSearchRunGroupId,
+            })}
+          />
+        )}
       </Box>
     </Box>
   );
@@ -241,6 +252,7 @@ const App = (props: AppProps) => {
             testExternalId: runStarted.testExternalId,
             ended: false,
             shareUrl: undefined,
+            gridSearchRunGroupId: runStarted.gridSearchRunGroupId,
             gridSearchParamsCombo: runStarted.gridSearchParamsCombo,
           },
         ];

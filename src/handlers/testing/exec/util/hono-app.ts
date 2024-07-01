@@ -3,7 +3,6 @@ import { Hono, type Context } from 'hono';
 import { type ZodError, z } from 'zod';
 import { EventName, emitter } from './emitter';
 import { RunManager } from './run-manager';
-import crypto from 'crypto';
 
 /**
  * Server that receives requests from the SDKs
@@ -42,19 +41,20 @@ export function createHonoApp(runManager: RunManager): Hono {
   });
 
   app.post(
-    '/grid',
+    '/grids',
     zValidator(
       'json',
       z.object({
-        testExternalId: z.string(),
         gridSearchParams: z.record(z.string(), z.array(z.unknown())),
       }),
       handleValidationResult,
     ),
     async (c) => {
-      // const data = c.req.valid('json');
-      // TODO: send POST to public API to create grid search row in DB
-      return c.json({ id: crypto.randomUUID() });
+      const data = c.req.valid('json');
+      const id = await runManager.handleCreateGrid({
+        gridSearchParams: data.gridSearchParams,
+      });
+      return c.json({ id });
     },
   );
 
@@ -64,8 +64,14 @@ export function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
-        gridSearchId: z.string().nullish(),
-        gridSearchParamsCombo: z.record(z.string(), z.unknown()).nullish(),
+        gridSearchRunGroupId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
+        gridSearchParamsCombo: z
+          .record(z.string(), z.unknown())
+          .nullish()
+          .transform((x) => x ?? undefined),
       }),
       handleValidationResult,
     ),
