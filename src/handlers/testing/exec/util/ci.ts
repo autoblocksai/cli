@@ -49,7 +49,7 @@ const zGitHubEnvSchema = z.object({
 });
 
 const zPullRequestSchema = z.object({
-  number: z.number(),
+  number: z.coerce.number(),
   title: z.string(),
   head: z.object({
     ref: z.string(),

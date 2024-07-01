@@ -743,21 +743,13 @@ export class RunManager {
         runDurationMs,
         runs: Object.values(this.runs),
         evaluations: this.evaluations,
-      })
-        .then(() => {
-          emitter.emit(EventName.CONSOLE_LOG, {
-            ctx: 'cli',
-            level: 'info',
-            message: 'Successfully posted comment to GitHub',
-          });
-        })
-        .catch((err) => {
-          emitter.emit(EventName.CONSOLE_LOG, {
-            ctx: 'cli',
-            level: 'warn',
-            message: `Failed to post comment to GitHub: ${err}`,
-          });
+      }).catch((err) => {
+        emitter.emit(EventName.CONSOLE_LOG, {
+          ctx: 'cli',
+          level: 'warn',
+          message: `Failed to post comment to GitHub: ${err}`,
         });
+      });
       promises.push(gitHubPromise);
     }
 
