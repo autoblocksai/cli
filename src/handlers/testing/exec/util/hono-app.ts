@@ -83,7 +83,10 @@ export function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         // TODO make required
-        runId: z.string().optional(),
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
       }),
       handleValidationResult,
     ),
@@ -101,7 +104,10 @@ export function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         // TODO make required
-        runId: z.string().optional(),
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
         event: z.object({
           message: z.string(),
@@ -162,7 +168,10 @@ export function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         // TODO make required
-        runId: z.string().optional(),
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
         testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
@@ -210,7 +219,10 @@ export function createHonoApp(runManager: RunManager): Hono {
       z.object({
         testExternalId: z.string(),
         // TODO make required
-        runId: z.string().optional(),
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
         evaluatorExternalId: z.string(),
         score: z.number(),
