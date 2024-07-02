@@ -5,6 +5,7 @@ import {
   type TestCaseEvent,
   type Evaluation,
   EvaluationPassed,
+  type TestRun,
 } from './models';
 import { postSlackMessage, postGitHubComment } from './comments';
 import { z } from 'zod';
@@ -29,16 +30,23 @@ export class RunManager {
   private endTime: Date | undefined = undefined;
 
   /**
+   * Map of run ID to run metadata
+   */
+  private runs: Record<string, TestRun>;
+
+  /**
    * Keep a map of each test's external ID to its run ID
    *
    * (we create a run for each test)
+   *
+   * TODO drop this once runId is being sent by the SDKs to each endpoint
    */
   private testExternalIdToRunId: Record<string, string>;
 
   /**
    * Keep a map of test case hashes to their result IDs
    *
-   * testExternalId -> testCaseHash -> testCaseResultId
+   * runId -> testCaseHash -> testCaseResultId
    */
   private testCaseHashToResultId: Record<string, Record<string, string>>;
 
@@ -80,6 +88,7 @@ export class RunManager {
     this.includeShareUrl = args.includeShareUrl;
     this.startTime = new Date();
 
+    this.runs = {};
     this.testExternalIdToRunId = {};
     this.testCaseHashToResultId = {};
     this.testCaseEvents = [];
@@ -193,35 +202,76 @@ export class RunManager {
     return this.ciBuildId;
   }
 
-  async handleStartRun(args: { testExternalId: string }): Promise<string> {
-    emitter.emit(EventName.RUN_STARTED, {
-      testExternalId: args.testExternalId,
+  async handleCreateGrid(args: {
+    gridSearchParams: Record<string, unknown[]>;
+  }): Promise<string> {
+    const { id } = await this.post<{ id: string }>('/grids', {
+      gridSearchParams: args.gridSearchParams,
     });
+    return id;
+  }
+
+  async handleStartRun(args: {
+    testExternalId: string;
+    gridSearchRunGroupId?: string;
+    gridSearchParamsCombo?: Record<string, unknown> | null;
+  }): Promise<string> {
+    // Create the run
     const { id } = await this.post<{ id: string }>('/runs', {
       testExternalId: args.testExternalId,
       message: this.message,
       buildId: this.ciBuildId,
+      gridSearchRunGroupId: args.gridSearchRunGroupId,
+      gridSearchParamsCombo: args.gridSearchParamsCombo,
     });
+
+    this.runs[id] = {
+      startedAt: new Date().toISOString(),
+      endedAt: undefined,
+      runId: id,
+      testExternalId: args.testExternalId,
+      gridSearchParamsCombo: args.gridSearchParamsCombo || undefined,
+    };
+
+    // TODO drop this map once SDKs are updated to pass run ID to every endpoint
     this.testExternalIdToRunId[args.testExternalId] = id;
+
+    // Emit run started to ink app
+    emitter.emit(EventName.RUN_STARTED, {
+      id,
+      testExternalId: args.testExternalId,
+      gridSearchRunGroupId: args.gridSearchRunGroupId,
+      gridSearchParamsCombo: args.gridSearchParamsCombo || undefined,
+    });
+
+    // Return the ID so that the SDKs can pass the run ID along with
+    // subsequent requests
     return id;
   }
 
-  async handleEndRun(args: { testExternalId: string }): Promise<void> {
-    const shareUrl = await this.createShareUrl({
+  async handleEndRun(args: {
+    // TODO drop testExternalId and make runId required argument
+    testExternalId: string;
+    runId?: string;
+  }): Promise<void> {
+    const runId = this.legacyGetCurrentRunId({
       testExternalId: args.testExternalId,
+      runId: args.runId,
     });
 
+    const shareUrl = await this.createShareUrl({ runId });
+
     emitter.emit(EventName.RUN_ENDED, {
-      id: this.currentRunId({ testExternalId: args.testExternalId }),
+      id: runId,
       testExternalId: args.testExternalId,
       shareUrl,
     });
 
     try {
-      const runId = this.currentRunId({ testExternalId: args.testExternalId });
       await this.post(`/runs/${runId}/end`);
     } finally {
       delete this.testExternalIdToRunId[args.testExternalId];
+      this.runs[runId].endedAt = new Date().toISOString();
     }
   }
 
@@ -230,16 +280,31 @@ export class RunManager {
    * terminates prematurely.
    */
   async endAllRuns() {
-    const testIdsToEnd = Object.keys(this.testExternalIdToRunId);
     await Promise.allSettled(
-      testIdsToEnd.map((testExternalId) => {
-        return this.handleEndRun({ testExternalId });
-      }),
+      Object.values(this.runs)
+        .filter((r) => !r.endedAt)
+        .map((r) =>
+          this.handleEndRun({
+            testExternalId: r.testExternalId,
+            runId: r.runId,
+          }),
+        ),
     );
   }
 
-  private currentRunId(args: { testExternalId: string }): string {
-    const runId = this.testExternalIdToRunId[args.testExternalId];
+  /**
+   * We used to maintain a test ID -> run ID map here in the CLI so that the SDKs didn't need to
+   * maintain and pass around the run ID to every endpoint. But to support grid search, which creates
+   * multiple runs per test suite in a single session, we need to return the run ID from /start and the
+   * SDKs must send this run ID to every endpoint. To keep the CLI backwards compatible, we still maintain
+   * the test ID -> run ID map while we wait for users to update their SDKs to the latest version.
+   */
+  private legacyGetCurrentRunId(args: {
+    testExternalId: string;
+    runId: string | undefined;
+  }): string {
+    // Use the runId if it's given, otherwise fall back to the test ID -> run ID map
+    const runId = args.runId || this.testExternalIdToRunId[args.testExternalId];
     if (!runId) {
       throw new Error(
         `No run ID found for test external ID ${args.testExternalId}`,
@@ -249,11 +314,11 @@ export class RunManager {
   }
 
   private testCaseResultIdFromHash(args: {
-    testExternalId: string;
+    runId: string;
     testCaseHash: string;
   }): string {
     const testCaseResultId =
-      this.testCaseHashToResultId[args.testExternalId]?.[args.testCaseHash];
+      this.testCaseHashToResultId[args.runId]?.[args.testCaseHash];
     if (!testCaseResultId) {
       throw new Error(
         `No corresponding test case result ID for test case hash ${args.testCaseHash}`,
@@ -262,16 +327,15 @@ export class RunManager {
     return testCaseResultId;
   }
 
-  private async createShareUrl(args: { testExternalId: string }) {
+  private async createShareUrl(args: { runId: string }) {
     // Share URL is only applicable for local runs
     // CI runs are always shareable
     if (this.isCI || !this.includeShareUrl) {
       return;
     }
     try {
-      const runId = this.currentRunId({ testExternalId: args.testExternalId });
       const { shareUrl } = await this.post<{ shareUrl: string }>(
-        `/runs/${runId}/share-url`,
+        `/runs/${args.runId}/share-url`,
       );
       return shareUrl;
     } catch (err) {
@@ -283,8 +347,17 @@ export class RunManager {
     }
   }
 
-  handleTestCaseEvent(event: TestCaseEvent) {
-    this.testCaseEvents.push(event);
+  handleTestCaseEvent(
+    // TODO make runId required
+    event: Omit<TestCaseEvent, 'runId'> & { runId?: string },
+  ) {
+    this.testCaseEvents.push({
+      ...event,
+      runId: this.legacyGetCurrentRunId({
+        testExternalId: event.testExternalId,
+        runId: event.runId,
+      }),
+    });
   }
 
   handleUncaughtError(args: {
@@ -297,8 +370,9 @@ export class RunManager {
       stacktrace: string;
     };
     // If originated from cmd, details about
-    // which test suite, test case, and evaluator
+    // which test suite, run, test case, and evaluator
     testExternalId?: string;
+    runId?: string;
     testCaseHash?: string;
     evaluatorExternalId?: string;
   }) {
@@ -308,7 +382,7 @@ export class RunManager {
       debugLines.push(`Test ID: ${args.testExternalId}`);
       try {
         debugLines.push(
-          `Run ID: ${this.currentRunId({ testExternalId: args.testExternalId })}`,
+          `Run ID: ${this.legacyGetCurrentRunId({ testExternalId: args.testExternalId, runId: args.runId })}`,
         );
       } catch {
         // Ignore
@@ -320,7 +394,10 @@ export class RunManager {
         try {
           debugLines.push(
             `Test Case Result ID: ${this.testCaseResultIdFromHash({
-              testExternalId: args.testExternalId,
+              runId: this.legacyGetCurrentRunId({
+                testExternalId: args.testExternalId,
+                runId: args.runId,
+              }),
               testCaseHash: args.testCaseHash,
             })}`,
           );
@@ -357,11 +434,13 @@ export class RunManager {
 
   async runUIBasedEvaluators(args: {
     testExternalId: string;
+    runId: string;
     testCaseId: string;
     testCaseHash: string;
   }) {
-    const runId = this.currentRunId({
+    const runId = this.legacyGetCurrentRunId({
       testExternalId: args.testExternalId,
+      runId: args.runId,
     });
     const { evaluationResults } = await this.post<{
       evaluationResults: {
@@ -372,6 +451,7 @@ export class RunManager {
     evaluationResults.forEach((result) => {
       const evaluation = {
         testExternalId: args.testExternalId,
+        runId,
         evaluatorExternalId: result.evaluatorExternalId,
         testCaseHash: args.testCaseHash,
         passed: result.passed ? EvaluationPassed.TRUE : EvaluationPassed.FALSE,
@@ -383,6 +463,7 @@ export class RunManager {
 
   async handleTestCaseResult(args: {
     testExternalId: string;
+    runId?: string;
     testCaseHash: string;
     testCaseBody: Record<string, unknown>;
     testCaseOutput?: unknown;
@@ -398,8 +479,9 @@ export class RunManager {
     testCaseHumanReviewInputFields?: { name: string; value: string }[] | null;
     testCaseHumanReviewOutputFields?: { name: string; value: string }[] | null;
   }) {
-    const runId = this.currentRunId({
+    const runId = this.legacyGetCurrentRunId({
       testExternalId: args.testExternalId,
+      runId: args.runId,
     });
 
     const { id: resultId } = await this.post<{ id: string }>(
@@ -411,16 +493,16 @@ export class RunManager {
       },
     );
 
-    if (!this.testCaseHashToResultId[args.testExternalId]) {
-      this.testCaseHashToResultId[args.testExternalId] = {};
+    if (!this.testCaseHashToResultId[runId]) {
+      this.testCaseHashToResultId[runId] = {};
     }
-    this.testCaseHashToResultId[args.testExternalId][args.testCaseHash] =
-      resultId;
+    this.testCaseHashToResultId[runId][args.testCaseHash] = resultId;
 
     const events = this.testCaseEvents
       .filter(
         (e) =>
           e.testExternalId === args.testExternalId &&
+          e.runId === runId &&
           e.testCaseHash === args.testCaseHash,
       )
       .map((e) => e.event);
@@ -472,6 +554,7 @@ export class RunManager {
       // If human review fields fails, we don't want to run this
       await this.runUIBasedEvaluators({
         testExternalId: args.testExternalId,
+        runId,
         testCaseId: resultId,
         testCaseHash: args.testCaseHash,
       });
@@ -513,6 +596,7 @@ export class RunManager {
 
   async handleTestCaseEval(args: {
     testExternalId: string;
+    runId?: string;
     testCaseHash: string;
     evaluatorExternalId: string;
     score: number;
@@ -545,18 +629,20 @@ export class RunManager {
       passed = EvaluationPassed.NOT_APPLICABLE;
     }
 
+    const runId = this.legacyGetCurrentRunId({
+      testExternalId: args.testExternalId,
+      runId: args.runId,
+    });
+
     emitter.emit(EventName.EVALUATION, {
       ...args,
       passed,
+      runId,
     });
 
     const testCaseResultId = this.testCaseResultIdFromHash({
-      testExternalId: args.testExternalId,
+      runId,
       testCaseHash: args.testCaseHash,
-    });
-
-    const runId = this.currentRunId({
-      testExternalId: args.testExternalId,
     });
 
     // Our /evaluations endpoint expects `passed` to be either:
@@ -580,6 +666,7 @@ export class RunManager {
 
     this.evaluations.push({
       testExternalId: args.testExternalId,
+      runId,
       evaluatorExternalId: args.evaluatorExternalId,
       testCaseHash: args.testCaseHash,
       passed,
@@ -639,6 +726,7 @@ export class RunManager {
         branchId: this.ciBranchId,
         ciContext: this.ciContext,
         runDurationMs,
+        runs: Object.values(this.runs),
         evaluations: this.evaluations,
       })
         .then(() => {
@@ -665,6 +753,7 @@ export class RunManager {
         branchId: this.ciBranchId,
         ciContext: this.ciContext,
         runDurationMs,
+        runs: Object.values(this.runs),
         evaluations: this.evaluations,
       }).catch((err) => {
         emitter.emit(EventName.CONSOLE_LOG, {

@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export interface TestRun {
+  startedAt: string;
+  endedAt: string | undefined;
+  runId: string;
+  testExternalId: string;
+  gridSearchParamsCombo: Record<string, unknown> | undefined;
+}
+
 export enum TestRunStatus {
   PASSED = 'PASSED',
   FAILED = 'FAILED',
@@ -14,6 +22,7 @@ export enum EvaluationPassed {
 
 export interface TestCaseEvent {
   testExternalId: string;
+  runId: string;
   testCaseHash: string;
   event: {
     message: string;
@@ -25,6 +34,7 @@ export interface TestCaseEvent {
 
 export const zEvaluationSchema = z.object({
   testExternalId: z.string(),
+  runId: z.string(),
   evaluatorExternalId: z.string(),
   testCaseHash: z.string(),
   passed: z.nativeEnum(EvaluationPassed),

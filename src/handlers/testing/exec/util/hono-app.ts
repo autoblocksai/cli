@@ -41,18 +41,44 @@ export function createHonoApp(runManager: RunManager): Hono {
   });
 
   app.post(
-    '/start',
+    '/grids',
     zValidator(
       'json',
       z.object({
-        testExternalId: z.string(),
+        gridSearchParams: z.record(z.string(), z.array(z.unknown())),
       }),
       handleValidationResult,
     ),
     async (c) => {
       const data = c.req.valid('json');
-      await runManager.handleStartRun(data);
-      return c.json('ok');
+      const id = await runManager.handleCreateGrid({
+        gridSearchParams: data.gridSearchParams,
+      });
+      return c.json({ id });
+    },
+  );
+
+  app.post(
+    '/start',
+    zValidator(
+      'json',
+      z.object({
+        testExternalId: z.string(),
+        gridSearchRunGroupId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
+        gridSearchParamsCombo: z
+          .record(z.string(), z.unknown())
+          .nullish()
+          .transform((x) => x ?? undefined),
+      }),
+      handleValidationResult,
+    ),
+    async (c) => {
+      const data = c.req.valid('json');
+      const runId = await runManager.handleStartRun(data);
+      return c.json({ id: runId });
     },
   );
 
@@ -62,6 +88,11 @@ export function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
+        // TODO make required
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
       }),
       handleValidationResult,
     ),
@@ -78,6 +109,11 @@ export function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
+        // TODO make required
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
         event: z.object({
           message: z.string(),
@@ -101,6 +137,10 @@ export function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z
           .string()
           .nullish()
@@ -133,6 +173,11 @@ export function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
+        // TODO make required
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
         testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
@@ -179,6 +224,11 @@ export function createHonoApp(runManager: RunManager): Hono {
       'json',
       z.object({
         testExternalId: z.string(),
+        // TODO make required
+        runId: z
+          .string()
+          .nullish()
+          .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
         evaluatorExternalId: z.string(),
         score: z.number(),

@@ -1,8 +1,14 @@
+import github from '@actions/github';
+import _ from 'lodash';
 import type { CIContext } from './ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
-import { type Evaluation, EvaluationPassed, TestRunStatus } from './models';
+import {
+  type Evaluation,
+  EvaluationPassed,
+  TestRunStatus,
+  type TestRun,
+} from './models';
 import { makeAutoblocksCIBuildSummaryHtmlUrl } from './url';
-import github from '@actions/github';
 import { emitter, EventName } from './emitter';
 
 // Commit messages are truncated if they're longer than this
@@ -37,6 +43,7 @@ export async function postSlackMessage(args: {
   buildId: string;
   ciContext: CIContext;
   runDurationMs: number;
+  runs: TestRun[];
   evaluations: Evaluation[];
 }) {
   const resp = await fetch(args.webhookUrl, {
@@ -122,6 +129,7 @@ export async function postGitHubComment(args: {
   buildId: string;
   ciContext: CIContext;
   runDurationMs: number;
+  runs: TestRun[];
   evaluations: Evaluation[];
 }) {
   const api = github.getOctokit(args.githubToken);
@@ -278,6 +286,7 @@ function makeGitHubComment(args: {
   buildId: string;
   ciContext: CIContext;
   runDurationMs: number;
+  runs: TestRun[];
   evaluations: Evaluation[];
 }): string {
   const autoblocksUrl = makeAutoblocksCIBuildSummaryHtmlUrl({
@@ -318,12 +327,21 @@ function makeGitHubComment(args: {
     [TestRunStatus.NO_RESULTS]: ':grey_question:',
   };
 
-  for (const testExternalId of sortedUniqueTestExternalIds(args.evaluations)) {
-    const evaluations = args.evaluations.filter(
-      (e) => e.testExternalId === testExternalId,
-    );
+  for (const run of sortedRuns(args.runs)) {
+    const evaluations = args.evaluations.filter((e) => e.runId === run.runId);
     const emoji = statusToEmoji[makeTestRunStatusFromEvaluations(evaluations)];
-    lines.push(`${emoji}&nbsp;&nbsp;**${testExternalId}**`);
+    let title = `${emoji}&nbsp;&nbsp;**${run.testExternalId}**`;
+
+    if (run.gridSearchParamsCombo) {
+      title +=
+        '&nbsp;&nbsp;&nbsp;&nbsp;' +
+        Object.entries(run.gridSearchParamsCombo)
+          .map(([key, value]) => {
+            return `${key} = **${JSON.stringify(value)}**`;
+          })
+          .join('&nbsp;&nbsp;');
+    }
+    lines.push(title);
     lines.push('```');
     lines.push(makeEvaluatorStatsTable({ evaluations }));
     lines.push('```');
@@ -347,6 +365,7 @@ function makeSlackMessageBlocks(args: {
   buildId: string;
   ciContext: CIContext;
   runDurationMs: number;
+  runs: TestRun[];
   evaluations: Evaluation[];
 }) {
   return {
@@ -378,7 +397,10 @@ function makeSlackMessageBlocks(args: {
       {
         type: 'divider',
       },
-      ...makeAllTestSuiteSections({ evaluations: args.evaluations }),
+      ...makeAllTestRunSections({
+        runs: args.runs,
+        evaluations: args.evaluations,
+      }),
     ],
   };
 }
@@ -402,8 +424,9 @@ function makeBuildName(args: {
   return `${args.workflowName} / ${args.jobName} (#${args.workflowRunNumber})`;
 }
 
-function sortedUniqueTestExternalIds(evaluations: Evaluation[]): string[] {
-  return [...new Set(evaluations.map((e) => e.testExternalId))].sort();
+function sortedRuns(runs: TestRun[]): TestRun[] {
+  // Sort by test ID so that runs from the same test suite are grouped together
+  return _.sortBy(runs, (r) => `${r.testExternalId}-${r.startedAt}`);
 }
 
 function makeStatusHeaderSection(args: {
@@ -444,27 +467,26 @@ function makeStatusHeaderSection(args: {
       },
       {
         type: 'mrkdwn',
-        text: `*Commit:*\n<${commitUrl}|${truncatedCommitSha}>  ${truncatedCommitMessage}`,
+        text: `*Commit:*\n<${commitUrl}|${truncatedCommitSha}> ${truncatedCommitMessage}`,
       },
     ],
   };
 }
 
-function makeAllTestSuiteSections(args: { evaluations: Evaluation[] }) {
-  return sortedUniqueTestExternalIds(args.evaluations).flatMap(
-    (testExternalId) => {
-      const evaluations = args.evaluations.filter(
-        (e) => e.testExternalId === testExternalId,
-      );
-      return makeSectionsForTestSuite({ testExternalId, evaluations });
-    },
-  );
+function makeAllTestRunSections(args: {
+  runs: TestRun[];
+  evaluations: Evaluation[];
+}) {
+  return sortedRuns(args.runs).flatMap((run) => {
+    const evaluations = args.evaluations.filter((e) => e.runId === run.runId);
+    return makeSectionsForTestRun({ run, evaluations });
+  });
 }
 
-function makeSectionsForTestSuite(args: {
-  testExternalId: string;
+function makeSectionsForTestRun(args: {
+  run: TestRun;
   // These evaluations have already been filtered to only include the ones
-  // belonging to this test suite
+  // belonging to this test run
   evaluations: Evaluation[];
 }) {
   const statusToEmoji: Record<TestRunStatus, string> = {
@@ -478,30 +500,47 @@ function makeSectionsForTestSuite(args: {
   const status = makeTestRunStatusFromEvaluations(args.evaluations);
   const statusEmoji = statusToEmoji[status];
 
-  return [
+  const sections: unknown[] = [
     {
       type: 'header',
       text: {
         type: 'plain_text',
-        text: `${statusEmoji} ${args.testExternalId}`,
+        text: `${statusEmoji} ${args.run.testExternalId}`,
         emoji: true,
       },
     },
-    {
-      type: 'rich_text',
-      elements: [
-        {
-          type: 'rich_text_preformatted',
-          elements: [
-            {
-              type: 'text',
-              text: makeEvaluatorStatsTable({ evaluations: args.evaluations }),
-            },
-          ],
-        },
-      ],
-    },
   ];
+
+  if (args.run.gridSearchParamsCombo) {
+    sections.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `\`${Object.entries(args.run.gridSearchParamsCombo)
+          .map(([key, value]) => {
+            return `${key} = ${JSON.stringify(value)}`;
+          })
+          .join(' '.repeat(2))}\``,
+      },
+    });
+  }
+
+  sections.push({
+    type: 'rich_text',
+    elements: [
+      {
+        type: 'rich_text_preformatted',
+        elements: [
+          {
+            type: 'text',
+            text: makeEvaluatorStatsTable({ evaluations: args.evaluations }),
+          },
+        ],
+      },
+    ],
+  });
+
+  return sections;
 }
 
 /**
