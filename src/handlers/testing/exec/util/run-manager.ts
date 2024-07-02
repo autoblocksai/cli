@@ -221,6 +221,7 @@ export class RunManager {
       testExternalId: args.testExternalId,
       message: this.message,
       buildId: this.ciBuildId,
+      gridSearchRunGroupId: args.gridSearchRunGroupId,
       gridSearchParamsCombo: args.gridSearchParamsCombo,
     });
 
