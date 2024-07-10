@@ -7,6 +7,10 @@ export enum SDKEnvironmentVariable {
   AUTOBLOCKS_ALIGN_TEST_EXTERNAL_ID = 'AUTOBLOCKS_ALIGN_TEST_EXTERNAL_ID',
   // Used in alignment mode to only run the given test case
   AUTOBLOCKS_ALIGN_TEST_CASE_HASH = 'AUTOBLOCKS_ALIGN_TEST_CASE_HASH',
+  // Used to filter to specific test suites
+  // different from AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES
+  // in that this does a fuzzy match on test suite ids rather than strict matching
+  AUTOBLOCKS_FILTERS_TEST_SUITES = 'AUTOBLOCKS_FILTERS_TEST_SUITES',
   // Used in UI-triggered override mode to only run the given test suites and test cases
   AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES = 'AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES',
   // Used in UI-triggered override mode to override prompt SDK revisions
@@ -29,6 +33,8 @@ const schemas = {
   [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_ALIGN_TEST_EXTERNAL_ID]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_ALIGN_TEST_CASE_HASH]: z.string(),
+  // List of test suite ids to filter on
+  [SDKEnvironmentVariable.AUTOBLOCKS_FILTERS_TEST_SUITES]: z.array(z.string()),
   // Map of test external ID to list of test case hashes
   [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]: z.record(
     z.string(),
