@@ -128,6 +128,13 @@ const parser = yargs(hideBin(process.argv))
               describe: 'Description for this test run',
               type: 'string',
             })
+            .option('test-suites', {
+              alias: 'ts',
+              describe:
+                'List of test suite IDs to run. A substring match will be performed on each ID.',
+              type: 'array',
+              default: [],
+            })
             .option('port', portOptions)
             .option('exit-1-on-evaluation-failure', {
               describe: 'Exit with code 1 if any evaluation fails',
@@ -157,6 +164,8 @@ const parser = yargs(hideBin(process.argv))
             command,
             commandArgs,
             apiKey: argv['api-key'],
+            // Convert test-suites to strings to avoid issues with yargs
+            testSuites: argv['test-suites'].map((testSuite) => `${testSuite}`),
             runMessage: argv.message,
             port: argv.port,
             exit1OnEvaluationFailure: argv['exit-1-on-evaluation-failure'],

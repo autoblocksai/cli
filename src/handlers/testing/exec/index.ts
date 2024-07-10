@@ -15,6 +15,7 @@ export async function exec(args: {
   command: string;
   commandArgs: string[];
   apiKey: string;
+  testSuites: string[];
   runMessage: string | undefined;
   port: number;
   exit1OnEvaluationFailure: boolean;
@@ -112,6 +113,8 @@ export async function exec(args: {
       execCommand(args.command, args.commandArgs, {
         env: makeSDKEnvVars({
           [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: serverAddress,
+          [SDKEnvironmentVariable.AUTOBLOCKS_FILTERS_TEST_SUITES]:
+            args.testSuites,
           [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]:
             ciContext?.autoblocksOverrides?.testsAndHashes,
           [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_PROMPT_REVISIONS]:
