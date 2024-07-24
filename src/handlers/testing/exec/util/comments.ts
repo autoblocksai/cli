@@ -547,10 +547,10 @@ function makeSectionsForTestRun(args: {
 /**
  * Make a table of the evaluator stats. For example:
  *
- * Evaluators             Test Cases
- * -------------------------------------------------------------
- * has-all-substrings      979 PASSED    121 FAILED    0 SKIPPED
- * is-friendly           1,000 PASSED      0 FAILED    0 SKIPPED
+ * Evaluators               Min / Avg / Max    Pass / Fail / Skip
+ * --------------------------------------------------------------
+ * has-all-substrings    0.00 / 0.75 / 1.00             3 / 1 / 0
+ * is-friendly           0.02 / 0.39 / 0.92             4 / 0 / 0
  */
 function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   // Get the evaluator IDs sorted alphabetically
@@ -659,8 +659,8 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
  * Numbers should be right-justified for their column.
  * For example:
  *
- * 0 .02 .12      3 PASSED    56 FAILED    0 SKIPPED
- * 0   0   1  1,000 PASSED     6 FAILED    0 SKIPPED
+ * 0.00 / 0.75 / 1.00    3 / 1 / 0
+ * 0.02 / 0.39 / 0.92    4 / 0 / 0
  */
 function makeEvaluatorStatsRow(args: {
   testCasesString: string;
