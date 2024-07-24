@@ -610,9 +610,11 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   // This is used to right-align the numbers in each column (passed / failed / skipped).
   const maxTestCasesStringLength = Math.max(
     ...Object.values(evaluatorStats).map((s) => s.testCasesString.length),
+    TEST_CASES_HEADER_NAME.length,
   );
   const maxScoreStringLength = Math.max(
     ...Object.values(evaluatorStats).map((s) => s.scoreString.length),
+    EVALUATOR_SCORE_HEADER_NAME.length,
   );
 
   // Add the header row
