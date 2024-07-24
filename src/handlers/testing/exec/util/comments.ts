@@ -606,7 +606,7 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
     };
   }
 
-  // Get the max length of each of the numPassed, numFailed, and numSkipped strings.
+  // Get the max length of each of the test cases and score strings.
   // This is used to right-align the numbers in each column (passed / failed / skipped).
   const maxTestCasesStringLength = Math.max(
     ...Object.values(evaluatorStats).map((s) => s.testCasesString.length),
