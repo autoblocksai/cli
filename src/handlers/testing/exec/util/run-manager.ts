@@ -446,6 +446,7 @@ export class RunManager {
       evaluationResults: {
         evaluatorExternalId: string;
         passed: boolean;
+        score: number;
       }[];
     }>(`/runs/${runId}/results/${args.testCaseId}/ui-based-evaluations`);
     evaluationResults.forEach((result) => {
@@ -455,6 +456,7 @@ export class RunManager {
         evaluatorExternalId: result.evaluatorExternalId,
         testCaseHash: args.testCaseHash,
         passed: result.passed ? EvaluationPassed.TRUE : EvaluationPassed.FALSE,
+        score: result.score,
       };
       emitter.emit(EventName.EVALUATION, evaluation);
       this.evaluations.push(evaluation);
@@ -670,6 +672,7 @@ export class RunManager {
       evaluatorExternalId: args.evaluatorExternalId,
       testCaseHash: args.testCaseHash,
       passed,
+      score: args.score,
     });
   }
 

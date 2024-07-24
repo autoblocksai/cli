@@ -38,6 +38,7 @@ export const zEvaluationSchema = z.object({
   evaluatorExternalId: z.string(),
   testCaseHash: z.string(),
   passed: z.nativeEnum(EvaluationPassed),
+  score: z.number(),
 });
 
 export type Evaluation = z.infer<typeof zEvaluationSchema>;

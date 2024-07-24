@@ -16,7 +16,8 @@ const MAX_COMMIT_MESSAGE_LENGTH = 50;
 
 // Header names for the evaluators + test cases "table"
 const EVALUATOR_HEADER_NAME = 'Evaluators';
-const TEST_CASES_HEADER_NAME = 'Test Cases';
+const TEST_CASES_HEADER_NAME = 'Pass / Fail / Skip';
+const EVALUATOR_SCORE_HEADER_NAME = 'Min / Avg / Max';
 
 // The number of spaces between the evaluator name column
 // and the test case stats column
@@ -546,10 +547,10 @@ function makeSectionsForTestRun(args: {
 /**
  * Make a table of the evaluator stats. For example:
  *
- * Evaluators             Test Cases
- * -------------------------------------------------------------
- * has-all-substrings      979 PASSED    121 FAILED    0 SKIPPED
- * is-friendly           1,000 PASSED      0 FAILED    0 SKIPPED
+ * Evaluators               Min / Avg / Max    Pass / Fail / Skip
+ * --------------------------------------------------------------
+ * has-all-substrings    0.00 / 0.75 / 1.00             3 / 1 / 0
+ * is-friendly           0.02 / 0.39 / 0.92             4 / 0 / 0
  */
 function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   // Get the evaluator IDs sorted alphabetically
@@ -571,9 +572,8 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   const evaluatorStats: Record<
     string,
     {
-      numPassedString: string;
-      numFailedString: string;
-      numSkippedString: string;
+      testCasesString: string;
+      scoreString: string;
     }
   > = {};
   for (const evaluatorId of evaluatorIds) {
@@ -590,6 +590,9 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
     const naCount = evaluations.filter(
       (e) => e.passed === EvaluationPassed.NOT_APPLICABLE,
     ).length;
+    const averageScore = _.meanBy(evaluations, (e) => e.score);
+    const minScore = _.minBy(evaluations, (e) => e.score)?.score ?? 0;
+    const maxScore = _.maxBy(evaluations, (e) => e.score)?.score ?? 0;
 
     // Find the # of test cases that don't have an evaluation for this evaluator
     const skippedCount = uniqTestCaseHashes.filter(
@@ -598,41 +601,45 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
 
     evaluatorStats[evaluatorId] = {
       // Consider N/A as passed to simplify
-      numPassedString: (passedCount + naCount).toLocaleString(),
-      numFailedString: failedCount.toLocaleString(),
-      numSkippedString: skippedCount.toLocaleString(),
+      testCasesString: `${(passedCount + naCount).toLocaleString()} / ${failedCount.toLocaleString()} / ${skippedCount.toLocaleString()}`,
+      scoreString: `${minScore.toFixed(2)} / ${averageScore.toFixed(2)} / ${maxScore.toFixed(2)}`,
     };
   }
 
-  // Get the max length of each of the numPassed, numFailed, and numSkipped strings.
-  // This is used to right-align the numbers in each column (passed / failed / skipped).
-  const maxNumPassedLength = Math.max(
-    ...Object.values(evaluatorStats).map((s) => s.numPassedString.length),
+  // Get the max length of each of the test cases and score strings.
+  // This is used to right-align the numbers and headers in each column (passed / failed / skipped).
+  const maxTestCasesStringLength = Math.max(
+    ...Object.values(evaluatorStats).map((s) => s.testCasesString.length),
+    TEST_CASES_HEADER_NAME.length,
   );
-  const maxNumFailedLength = Math.max(
-    ...Object.values(evaluatorStats).map((s) => s.numFailedString.length),
-  );
-  const maxNumSkippedLength = Math.max(
-    ...Object.values(evaluatorStats).map((s) => s.numSkippedString.length),
+  const maxScoreStringLength = Math.max(
+    ...Object.values(evaluatorStats).map((s) => s.scoreString.length),
+    EVALUATOR_SCORE_HEADER_NAME.length,
   );
 
   // Add the header row
   const paddedEvaluatorHeader =
     EVALUATOR_HEADER_NAME.padEnd(maxEvaluatorIdLength);
-  const rows: string[] = [
-    `${paddedEvaluatorHeader}${COLUMN_GAP}${TEST_CASES_HEADER_NAME}`,
+  const paddedScoreHeader =
+    EVALUATOR_SCORE_HEADER_NAME.padStart(maxScoreStringLength);
+  const paddedTestCasesHeader = TEST_CASES_HEADER_NAME.padStart(
+    maxTestCasesStringLength,
+  );
+  const headers = [
+    paddedEvaluatorHeader,
+    paddedScoreHeader,
+    paddedTestCasesHeader,
   ];
+  const rows: string[] = [headers.join(COLUMN_GAP)];
 
   // Add the evaluator stats rows
   evaluatorIds.forEach((evaluatorId) => {
     const stats = evaluatorStats[evaluatorId];
     const statsAsString = makeEvaluatorStatsRow({
-      numPassedString: stats.numPassedString,
-      numFailedString: stats.numFailedString,
-      numSkippedString: stats.numSkippedString,
-      maxNumPassedLength,
-      maxNumFailedLength,
-      maxNumSkippedLength,
+      testCasesString: stats.testCasesString,
+      scoreString: stats.scoreString,
+      maxTestCasesStringLength,
+      maxScoreStringLength,
     });
 
     const paddedEvaluatorId = evaluatorId.padEnd(maxEvaluatorIdLength);
@@ -652,30 +659,19 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
  * Numbers should be right-justified for their column.
  * For example:
  *
- *       3 PASSED    56 FAILED    0 SKIPPED
- *   1,000 PASSED     6 FAILED    0 SKIPPED
+ * 0.00 / 0.75 / 1.00    3 / 1 / 0
+ * 0.02 / 0.39 / 0.92    4 / 0 / 0
  */
 function makeEvaluatorStatsRow(args: {
-  numPassedString: string;
-  numFailedString: string;
-  numSkippedString: string;
-  maxNumPassedLength: number;
-  maxNumFailedLength: number;
-  maxNumSkippedLength: number;
+  testCasesString: string;
+  scoreString: string;
+  maxTestCasesStringLength: number;
+  maxScoreStringLength: number;
 }): string {
-  const paddedNumPassed = args.numPassedString.padStart(
-    args.maxNumPassedLength,
+  const paddedTestCasesString = args.testCasesString.padStart(
+    args.maxTestCasesStringLength,
   );
-  const paddedNumFailed = args.numFailedString.padStart(
-    args.maxNumFailedLength,
-  );
-  const paddedNumSkipped = args.numSkippedString.padStart(
-    args.maxNumSkippedLength,
-  );
+  const paddedScore = args.scoreString.padStart(args.maxScoreStringLength);
 
-  return [
-    `${paddedNumPassed} PASSED`,
-    `${paddedNumFailed} FAILED`,
-    `${paddedNumSkipped} SKIPPED`,
-  ].join(COLUMN_GAP);
+  return [`${paddedScore}`, `${paddedTestCasesString}`].join(COLUMN_GAP);
 }
