@@ -16,7 +16,7 @@ const MAX_COMMIT_MESSAGE_LENGTH = 50;
 
 // Header names for the evaluators + test cases "table"
 const EVALUATOR_HEADER_NAME = 'Evaluators';
-const TEST_CASES_HEADER_NAME = 'Passed / Failed / Skipped';
+const TEST_CASES_HEADER_NAME = 'Test Cases';
 const EVALUATOR_SCORE_HEADER_NAME = 'Min / Avg / Max';
 
 // The number of spaces between the evaluator name column
@@ -601,7 +601,7 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
 
     evaluatorStats[evaluatorId] = {
       // Consider N/A as passed to simplify
-      testCasesString: `${(passedCount + naCount).toLocaleString()} / ${failedCount.toLocaleString()} / ${skippedCount.toLocaleString()}`,
+      testCasesString: `${(passedCount + naCount).toLocaleString()} ${statusToIcon[TestRunStatus.PASSED]} / ${failedCount.toLocaleString()} ${statusToIcon[TestRunStatus.FAILED]} / ${skippedCount.toLocaleString()} ${statusToIcon[TestRunStatus.NO_RESULTS]}`,
       scoreString: `${minScore.toFixed(2)} / ${averageScore.toFixed(2)} / ${maxScore.toFixed(2)}`,
     };
   }
