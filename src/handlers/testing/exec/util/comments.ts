@@ -16,8 +16,8 @@ const MAX_COMMIT_MESSAGE_LENGTH = 50;
 
 // Header names for the evaluators + test cases "table"
 const EVALUATOR_HEADER_NAME = 'Evaluators';
-const TEST_CASES_HEADER_NAME = 'Passed/Failed/Skipped Test Cases';
-const EVALUATOR_SCORE_HEADER_NAME = 'Min/Avg/Max Score';
+const TEST_CASES_HEADER_NAME = 'Passed / Failed / Skipped';
+const EVALUATOR_SCORE_HEADER_NAME = 'Min / Avg / Max';
 
 // The number of spaces between the evaluator name column
 // and the test case stats column
@@ -572,9 +572,7 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   const evaluatorStats: Record<
     string,
     {
-      numPassedString: string;
-      numFailedString: string;
-      numSkippedString: string;
+      testCasesString: string;
       scoreString: string;
     }
   > = {};
@@ -603,23 +601,15 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
 
     evaluatorStats[evaluatorId] = {
       // Consider N/A as passed to simplify
-      numPassedString: (passedCount + naCount).toLocaleString(),
-      numFailedString: failedCount.toLocaleString(),
-      numSkippedString: skippedCount.toLocaleString(),
-      scoreString: `${minScore.toLocaleString()} / ${averageScore.toLocaleString()} / ${maxScore.toLocaleString()}`,
+      testCasesString: `${(passedCount + naCount).toLocaleString()} / ${failedCount.toLocaleString()} / ${skippedCount.toLocaleString()}`,
+      scoreString: `${minScore.toFixed(2)} / ${averageScore.toFixed(2)} / ${maxScore.toFixed(2)}`,
     };
   }
 
   // Get the max length of each of the numPassed, numFailed, and numSkipped strings.
   // This is used to right-align the numbers in each column (passed / failed / skipped).
-  const maxNumPassedLength = Math.max(
-    ...Object.values(evaluatorStats).map((s) => s.numPassedString.length),
-  );
-  const maxNumFailedLength = Math.max(
-    ...Object.values(evaluatorStats).map((s) => s.numFailedString.length),
-  );
-  const maxNumSkippedLength = Math.max(
-    ...Object.values(evaluatorStats).map((s) => s.numSkippedString.length),
+  const maxTestCasesStringLength = Math.max(
+    ...Object.values(evaluatorStats).map((s) => s.testCasesString.length),
   );
   const maxScoreStringLength = Math.max(
     ...Object.values(evaluatorStats).map((s) => s.scoreString.length),
@@ -629,11 +619,14 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   const paddedEvaluatorHeader =
     EVALUATOR_HEADER_NAME.padEnd(maxEvaluatorIdLength);
   const paddedScoreHeader =
-    EVALUATOR_SCORE_HEADER_NAME.padEnd(maxScoreStringLength);
+    EVALUATOR_SCORE_HEADER_NAME.padStart(maxScoreStringLength);
+  const paddedTestCasesHeader = TEST_CASES_HEADER_NAME.padStart(
+    maxTestCasesStringLength,
+  );
   const headers = [
     paddedEvaluatorHeader,
     paddedScoreHeader,
-    TEST_CASES_HEADER_NAME,
+    paddedTestCasesHeader,
   ];
   const rows: string[] = [headers.join(COLUMN_GAP)];
 
@@ -641,13 +634,9 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
   evaluatorIds.forEach((evaluatorId) => {
     const stats = evaluatorStats[evaluatorId];
     const statsAsString = makeEvaluatorStatsRow({
-      numPassedString: stats.numPassedString,
-      numFailedString: stats.numFailedString,
-      numSkippedString: stats.numSkippedString,
+      testCasesString: stats.testCasesString,
       scoreString: stats.scoreString,
-      maxNumPassedLength,
-      maxNumFailedLength,
-      maxNumSkippedLength,
+      maxTestCasesStringLength,
       maxScoreStringLength,
     });
 
@@ -672,30 +661,15 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
  * 0   0   1  1,000 PASSED     6 FAILED    0 SKIPPED
  */
 function makeEvaluatorStatsRow(args: {
-  numPassedString: string;
-  numFailedString: string;
-  numSkippedString: string;
+  testCasesString: string;
   scoreString: string;
-  maxNumPassedLength: number;
-  maxNumFailedLength: number;
-  maxNumSkippedLength: number;
+  maxTestCasesStringLength: number;
   maxScoreStringLength: number;
 }): string {
-  const paddedNumPassed = args.numPassedString.padStart(
-    args.maxNumPassedLength,
-  );
-  const paddedNumFailed = args.numFailedString.padStart(
-    args.maxNumFailedLength,
-  );
-  const paddedNumSkipped = args.numSkippedString.padStart(
-    args.maxNumSkippedLength,
+  const paddedTestCasesString = args.testCasesString.padStart(
+    args.maxTestCasesStringLength,
   );
   const paddedScore = args.scoreString.padStart(args.maxScoreStringLength);
 
-  return [
-    `${paddedScore}`,
-    `${paddedNumPassed} PASSED`,
-    `${paddedNumFailed} FAILED`,
-    `${paddedNumSkipped} SKIPPED`,
-  ].join(COLUMN_GAP);
+  return [`${paddedScore}`, `${paddedTestCasesString}`].join(COLUMN_GAP);
 }
