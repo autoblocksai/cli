@@ -1,5 +1,5 @@
 import github from '@actions/github';
-import _, { maxBy, meanBy, minBy } from 'lodash';
+import _ from 'lodash';
 import type { CIContext } from './ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
 import {
@@ -596,9 +596,9 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
     const naCount = evaluations.filter(
       (e) => e.passed === EvaluationPassed.NOT_APPLICABLE,
     ).length;
-    const averageScore = meanBy(evaluations, (e) => e.score);
-    const minScore = minBy(evaluations, (e) => e.score)?.score ?? 0;
-    const maxScore = maxBy(evaluations, (e) => e.score)?.score ?? 0;
+    const averageScore = _.meanBy(evaluations, (e) => e.score);
+    const minScore = _.minBy(evaluations, (e) => e.score)?.score ?? 0;
+    const maxScore = _.maxBy(evaluations, (e) => e.score)?.score ?? 0;
 
     // Find the # of test cases that don't have an evaluation for this evaluator
     const skippedCount = uniqTestCaseHashes.filter(
@@ -691,8 +691,8 @@ function makeEvaluatorStatsTable(args: { evaluations: Evaluation[] }): string {
  * Numbers should be right-justified for their column.
  * For example:
  *
- *       3 PASSED    56 FAILED    0 SKIPPED
- *   1,000 PASSED     6 FAILED    0 SKIPPED
+ * 0 .02 .12      3 PASSED    56 FAILED    0 SKIPPED
+ * 0   0   1  1,000 PASSED     6 FAILED    0 SKIPPED
  */
 function makeEvaluatorStatsRow(args: {
   numPassedString: string;
