@@ -17,9 +17,9 @@ const MAX_COMMIT_MESSAGE_LENGTH = 50;
 // Header names for the evaluators + test cases "table"
 const EVALUATOR_HEADER_NAME = 'Evaluators';
 const TEST_CASES_HEADER_NAME = 'Test Cases';
-const EVALUATOR_AVG_HEADER_NAME = 'Avg';
-const EVALUATOR_MIN_HEADER_NAME = 'Min';
-const EVALUATOR_MAX_HEADER_NAME = 'Max';
+const EVALUATOR_AVG_HEADER_NAME = 'Avg Score';
+const EVALUATOR_MIN_HEADER_NAME = 'Min Score';
+const EVALUATOR_MAX_HEADER_NAME = 'Max Score';
 
 // The number of spaces between the evaluator name column
 // and the test case stats column
