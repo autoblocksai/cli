@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@autoblocks/client": "*",
+    "lodash": "^4.17.21",
     "typescript": "*"
   }
 }
