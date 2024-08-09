@@ -213,8 +213,8 @@ export function createHonoApp(runManager: RunManager): Hono {
     ),
     async (c) => {
       const data = c.req.valid('json');
-      await runManager.handleTestCaseResult(data);
-      return c.json('ok');
+      const { resultId } = await runManager.handleTestCaseResult(data);
+      return c.json({ id: resultId });
     },
   );
 
