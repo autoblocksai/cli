@@ -480,7 +480,7 @@ export class RunManager {
       | null;
     testCaseHumanReviewInputFields?: { name: string; value: string }[] | null;
     testCaseHumanReviewOutputFields?: { name: string; value: string }[] | null;
-  }) {
+  }): Promise<{ resultId: string }> {
     const runId = this.legacyGetCurrentRunId({
       testExternalId: args.testExternalId,
       runId: args.runId,
@@ -567,6 +567,8 @@ export class RunManager {
         message: `Failed to run AI evaluators created on the Autoblocks UI for test case hash ${args.testCaseHash}: ${err}`,
       });
     }
+
+    return { resultId };
   }
 
   private determineIfEvaluationPassed(args: {
