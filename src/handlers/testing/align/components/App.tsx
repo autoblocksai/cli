@@ -116,11 +116,12 @@ function App(props: AppProps) {
     }
 
     switch (action) {
-      case AfterGradeAction.GRADE_NEXT:
+      case AfterGradeAction.GRADE_NEXT: {
         const prevHash = currentTestCaseResult.data.testCaseHash;
         await requestNextTestCaseResult({ prevHash });
         break;
-      case AfterGradeAction.STOP_GRADING:
+      }
+      case AfterGradeAction.STOP_GRADING: {
         setCurrentTestCaseResult({
           isLoading: false,
           data: undefined,
@@ -137,6 +138,7 @@ function App(props: AppProps) {
         props.onExit();
         inkApp.exit();
         break;
+      }
     }
   };
 
