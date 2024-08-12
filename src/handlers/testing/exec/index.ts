@@ -112,6 +112,7 @@ export async function exec(args: {
       // Execute the command
       execCommand(args.command, args.commandArgs, {
         env: makeSDKEnvVars({
+          [SDKEnvironmentVariable.AUTOBLOCKS_API_KEY]: args.apiKey,
           [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: serverAddress,
           [SDKEnvironmentVariable.AUTOBLOCKS_FILTERS_TEST_SUITES]:
             args.testSuites,

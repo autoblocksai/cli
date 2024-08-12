@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { AUTOBLOCKS_API_KEY_NAME } from './constants';
 
 export enum SDKEnvironmentVariable {
+  AUTOBLOCKS_API_KEY = AUTOBLOCKS_API_KEY_NAME,
   // Used by commands where the SDKs communicate results to a server running in the CLI
   AUTOBLOCKS_CLI_SERVER_ADDRESS = 'AUTOBLOCKS_CLI_SERVER_ADDRESS',
   // Used in alignment mode to only run the given test suite
@@ -30,6 +32,7 @@ const backwardsCompatMappings: Record<string, string[]> = {
 };
 
 const schemas = {
+  [SDKEnvironmentVariable.AUTOBLOCKS_API_KEY]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_ALIGN_TEST_EXTERNAL_ID]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_ALIGN_TEST_CASE_HASH]: z.string(),
