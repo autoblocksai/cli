@@ -23,6 +23,7 @@ export async function runCommandInAlignmentMode(args: {
           args.testCaseHash,
       }),
     });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (err) {
     // TODO handle errors
   }

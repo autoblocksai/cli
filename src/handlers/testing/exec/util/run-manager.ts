@@ -8,14 +8,11 @@ import {
   type TestRun,
 } from './models';
 import { postSlackMessage, postGitHubComment } from './comments';
-import { z } from 'zod';
 
-const zHttpError = z.object({
-  status: z.number(),
-  data: z.unknown(),
-});
-
-type HttpError = z.infer<typeof zHttpError>;
+type HttpError = {
+  status: number;
+  data: unknown;
+};
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 

@@ -48,7 +48,7 @@ export const zTestCaseResult = z.object({
   testCaseOutput: z.unknown(),
 });
 
-const zGradedTestCaseResult = zTestCaseResult.merge(
+export const zGradedTestCaseResult = zTestCaseResult.merge(
   z.object({
     grade: zGrade,
   }),
