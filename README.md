@@ -24,8 +24,8 @@
   <img src="assets/ts-logo-128.png" width="64px">
 </p>
 <p align="center">
-  <a href="https://github.com/autoblocksai/javascript-sdk/actions/workflows/ci.yml">
-    <img src="https://github.com/autoblocksai/javascript-sdk/actions/workflows/ci.yml/badge.svg?branch=main">
+  <a href="https://github.com/autoblocksai/cli/actions/workflows/ci.yml">
+    <img src="https://github.com/autoblocksai/cli/actions/workflows/ci.yml/badge.svg?branch=main">
   </a>
 </p>
 
