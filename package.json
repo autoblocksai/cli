@@ -36,7 +36,7 @@
     "@hono/node-server": "^1.7.0",
     "@hono/zod-validator": "^0.2.0",
     "hono": "^4.0.0",
-    "ink": "^4.0.0",
+    "ink": "^5.0.0",
     "ink-select-input": "^5.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^5.0.1",
