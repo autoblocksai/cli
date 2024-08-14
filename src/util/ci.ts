@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import github from '@actions/github';
 import fs from 'fs/promises';
+import { post } from './api';
 
 const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
 
@@ -124,7 +125,7 @@ function parseWorkflowIdFromWorkflowRef(args: { workflowRef: string }): string {
   return workflowParts[workflowParts.length - 1];
 }
 
-export async function makeCIContext(): Promise<CIContext> {
+async function makeCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
   const api = github.getOctokit(env.GITHUB_TOKEN);
 
@@ -223,5 +224,56 @@ export async function makeCIContext(): Promise<CIContext> {
     pullRequestNumber,
     pullRequestTitle,
     autoblocksOverrides: autoblocksOverrides,
+  };
+}
+
+/**
+ * Creates a new CI build on Autoblocks and returns the build ID, branch ID, and CI context.
+ */
+export async function setupCIContext(args: { apiKey: string }): Promise<{
+  buildId: string;
+  branchId: string;
+  ciContext: CIContext;
+} | null> {
+  const ciContext = await makeCIContext();
+
+  if (!ciContext) {
+    return null;
+  }
+
+  const { id, branchId } = await post<{ id: string; branchId: string }>({
+    path: '/testing/ci/builds',
+    apiKey: args.apiKey,
+    body: {
+      gitProvider: ciContext.gitProvider,
+      repositoryExternalId: ciContext.repoId,
+      repositoryName: ciContext.repoName,
+      repositoryHtmlUrl: ciContext.repoHtmlUrl,
+      branchExternalId: ciContext.branchId,
+      branchName: ciContext.branchName,
+      isDefaultBranch: ciContext.isDefaultBranch,
+      ciProvider: ciContext.ciProvider,
+      buildHtmlUrl: ciContext.buildHtmlUrl,
+      workflowId: ciContext.workflowId,
+      workflowName: ciContext.workflowName,
+      workflowRunNumber: ciContext.workflowRunNumber,
+      jobName: ciContext.jobName,
+      commitSha: ciContext.commitSha,
+      commitMessage: ciContext.commitMessage,
+      commitCommitterName: ciContext.commitCommitterName,
+      commitCommitterEmail: ciContext.commitCommitterEmail,
+      commitAuthorName: ciContext.commitAuthorName,
+      commitAuthorEmail: ciContext.commitAuthorEmail,
+      commitCommittedDate: ciContext.commitCommittedDate,
+      pullRequestNumber: ciContext.pullRequestNumber,
+      pullRequestTitle: ciContext.pullRequestTitle,
+      autoblocksOverrides: ciContext.autoblocksOverrides,
+    },
+  });
+
+  return {
+    buildId: id,
+    branchId,
+    ciContext,
   };
 }
