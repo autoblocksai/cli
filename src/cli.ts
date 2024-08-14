@@ -205,7 +205,7 @@ const parser = yargs(hideBin(process.argv))
       )
       .command(
         'make-ci-context',
-        'Make the context for a CI test run and set as GitHub environment variables. Used when running Autoblocks tests in CI, without using exec.',
+        'Make the context for a CI test run and set it as GitHub environment variables. Used when running Autoblocks tests in CI, without using exec.',
         (yargs) => {
           return yargs
             .option('api-key', apiKeyOptions)
