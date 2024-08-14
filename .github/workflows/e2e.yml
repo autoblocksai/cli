@@ -53,7 +53,7 @@ jobs:
         run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.ADAM_TEST_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Run tests in e2e/python
-        run: ../../bin/cli.js testing exec -- python3 run.py
+        run: python3 run.py
         working-directory: e2e/python
         env:
           PYTHONPATH: ${{ github.workspace }}/e2e/python
