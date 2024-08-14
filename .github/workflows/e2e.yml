@@ -55,6 +55,8 @@ jobs:
       - name: Make CI context
         run: ../../bin/cli.js testing make-ci-context
         working-directory: e2e/python
+        env:
+          AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
       - name: Run tests in e2e/python
         run: python3 run.py
