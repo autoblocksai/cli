@@ -202,6 +202,26 @@ const parser = yargs(hideBin(process.argv))
             port: argv.port,
           });
         },
+      )
+      .command(
+        'make-ci-context',
+        'Make a CI context for a test run',
+        (yargs) => {
+          return yargs
+            .option('api-key', apiKeyOptions)
+            .option('slack-webhook-url', {
+              describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable`,
+              type: 'string',
+              default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
+            })
+            .help();
+        },
+        (argv) => {
+          handlers.testing.makeCIContext({
+            apiKey: argv['api-key'],
+            slackWebhookUrl: argv['slack-webhook-url'],
+          });
+        },
       );
   })
   // Populates `argv['--']` with the unparsed arguments after --

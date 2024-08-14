@@ -52,6 +52,10 @@ jobs:
       - name: Set Slack webhook URL
         run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.ADAM_TEST_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
+      - name: Make CI context
+        run: ../../bin/cli.js testing make-ci-context
+        working-directory: e2e/python
+
       - name: Run tests in e2e/python
         run: python3 run.py
         working-directory: e2e/python

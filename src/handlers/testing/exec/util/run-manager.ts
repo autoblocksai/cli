@@ -149,7 +149,11 @@ export class RunManager {
     return this.ciContext;
   }
 
-  async setupCIContext(): Promise<CIContext | null> {
+  async setupCIContext(): Promise<{
+    buildId: string;
+    branchId: string;
+    ciContext: CIContext;
+  } | null> {
     const ciContext = await this.makeCIContext();
 
     if (!ciContext) {
@@ -188,7 +192,11 @@ export class RunManager {
     this.ciBuildId = id;
     this.ciBranchId = branchId;
 
-    return ciContext;
+    return {
+      buildId: id,
+      branchId,
+      ciContext,
+    };
   }
 
   getCIBranchId(): string | undefined {
