@@ -1,6 +1,6 @@
 import github from '@actions/github';
 import _ from 'lodash';
-import type { CIContext } from './ci';
+import type { CIContext } from '../../../../util/ci';
 import { makeTestRunStatusFromEvaluations } from './evals';
 import {
   type Evaluation,
