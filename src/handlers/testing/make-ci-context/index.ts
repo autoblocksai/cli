@@ -25,8 +25,7 @@ export async function makeCIContext(args: {
   }
   const envVars = makeSDKEnvVars({
     [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID]: result.buildId,
-    [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_SLACK_WEBHOOK_URL]:
-      args.slackWebhookUrl,
+    [SDKEnvironmentVariable.AUTOBLOCKS_SLACK_WEBHOOK_URL]: args.slackWebhookUrl,
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]:
       result.ciContext.autoblocksOverrides?.testsAndHashes,
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_PROMPT_REVISIONS]:

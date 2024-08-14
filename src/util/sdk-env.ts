@@ -1,9 +1,14 @@
 import { z } from 'zod';
-import { AUTOBLOCKS_API_KEY_NAME } from './constants';
+import {
+  AUTOBLOCKS_API_KEY_NAME,
+  AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME,
+} from './constants';
 
 export enum SDKEnvironmentVariable {
+  // Used when running tests on CI without using exec to associate the results to a specific CI build
   AUTOBLOCKS_CI_TEST_RUN_BUILD_ID = 'AUTOBLOCKS_CI_TEST_RUN_BUILD_ID',
-  AUTOBLOCKS_CI_TEST_RUN_SLACK_WEBHOOK_URL = 'AUTOBLOCKS_CI_TEST_RUN_SLACK_WEBHOOK_URL',
+  // Used when running tests on CI to send Slack notifications
+  AUTOBLOCKS_SLACK_WEBHOOK_URL = AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME,
   AUTOBLOCKS_API_KEY = AUTOBLOCKS_API_KEY_NAME,
   // Used by commands where the SDKs communicate results to a server running in the CLI
   AUTOBLOCKS_CLI_SERVER_ADDRESS = 'AUTOBLOCKS_CLI_SERVER_ADDRESS',
@@ -35,9 +40,7 @@ const backwardsCompatMappings: Record<string, string[]> = {
 
 const schemas = {
   [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID]: z.string(),
-  [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_SLACK_WEBHOOK_URL]: z
-    .string()
-    .url(),
+  [SDKEnvironmentVariable.AUTOBLOCKS_SLACK_WEBHOOK_URL]: z.string().url(),
   [SDKEnvironmentVariable.AUTOBLOCKS_API_KEY]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: z.string(),
   [SDKEnvironmentVariable.AUTOBLOCKS_ALIGN_TEST_EXTERNAL_ID]: z.string(),
