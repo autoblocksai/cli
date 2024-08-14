@@ -1,5 +1,5 @@
 import { exec } from './exec';
 import { align } from './align';
-import { makeCIContext } from './make-ci-context';
+import { setupCIContext } from './setup-ci-context';
 
-export { exec, align, makeCIContext };
+export { exec, align, setupCIContext };

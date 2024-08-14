@@ -101,7 +101,7 @@ jobs:
         run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Make CI context
-        run: ../../bin/cli.js testing make-ci-context
+        run: ../../bin/cli.js testing setup-ci-context
         working-directory: e2e/python
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

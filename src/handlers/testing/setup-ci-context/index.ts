@@ -1,14 +1,14 @@
 import { SDKEnvironmentVariable, makeSDKEnvVars } from '../../../util/sdk-env';
 import * as core from '@actions/core';
-import { setupCIContext } from '../../../util/ci';
+import { setupCIContext as setupCIContextUtil } from '../../../util/ci';
 
-export async function makeCIContext(args: {
+export async function setupCIContext(args: {
   apiKey: string;
   slackWebhookUrl?: string;
 }) {
   let result;
   try {
-    result = await setupCIContext({ apiKey: args.apiKey });
+    result = await setupCIContextUtil({ apiKey: args.apiKey });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);

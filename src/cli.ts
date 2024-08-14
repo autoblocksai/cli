@@ -204,8 +204,8 @@ const parser = yargs(hideBin(process.argv))
         },
       )
       .command(
-        'make-ci-context',
-        'Make the context for a CI test run and set it as GitHub environment variables. Used when running Autoblocks tests in CI, without using exec.',
+        'setup-ci-context',
+        'Setup the context for a CI test run and set the output as GitHub environment variables. Used when running Autoblocks tests in CI, without using exec.',
         (yargs) => {
           return yargs
             .option('api-key', apiKeyOptions)
@@ -217,7 +217,7 @@ const parser = yargs(hideBin(process.argv))
             .help();
         },
         (argv) => {
-          handlers.testing.makeCIContext({
+          handlers.testing.setupCIContext({
             apiKey: argv['api-key'],
             slackWebhookUrl: argv['slack-webhook-url'],
           });
