@@ -59,6 +59,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/e2e/python
           FORCE_COLOR: 3
+          TEST_SUITE_SUFFIX: 'with-cli-runner'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
@@ -112,6 +113,7 @@ jobs:
         working-directory: e2e/python
         env:
           PYTHONPATH: ${{ github.workspace }}/e2e/python
+          TEST_SUITE_SUFFIX: 'no-cli-runner'
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
   ts:
@@ -157,7 +159,60 @@ jobs:
         working-directory: e2e/typescript
         env:
           FORCE_COLOR: 3
+          TEST_SUITE_SUFFIX: 'with-cli-runner'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
+
+  ts-no-cli-runner:
+    name: typescript-e2e-no-cli-runner-${{ github.event_name }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # For debugging purposes
+      - name: Dump GitHub context
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CLI dependencies
+        run: npm ci
+
+      - name: Build CLI
+        run: npm run build
+
+      - name: Install dependencies in e2e/typescript
+        run: npm install
+        working-directory: e2e/typescript
+
+      # Set the AUTOBLOCKS_SLACK_WEBHOOK_URL environment variable
+      # if this workflow was triggered by a scheduled run, since
+      # we only want to post to Slack on scheduled runs and not on
+      # every push or pull request.
+      - name: Set Slack webhook URL
+        if: github.event_name == 'schedule'
+        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+
+      - name: Setup CI context
+        run: ../../bin/cli.js testing setup-ci-context
+        working-directory: e2e/typescript
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
+
+      - name: Run tests in e2e/typescript
+        run: npx tsx run.ts
+        working-directory: e2e/typescript
+        env:
+          TEST_SUITE_SUFFIX: 'no-cli-runner'
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
   notify:

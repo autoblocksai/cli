@@ -80,14 +80,14 @@ function genTestCases(n: number): MyTestCase[] {
 (async () => {
   await Promise.allSettled([
     runTestSuite<MyTestCase, string>({
-      id: 'typescript-e2e-test-suite-1',
+      id: `typescript-e2e-test-suite-1-${process.env['TEST_SUITE_SUFFIX']}`,
       fn: testFn,
       testCaseHash: ['input'],
       testCases: genTestCases(4),
       evaluators: [new HasAllSubstrings(), new IsFriendly()],
     }),
     runTestSuite<MyTestCase, string>({
-      id: 'typescript-e2e-test-suite-2',
+      id: `typescript-e2e-test-suite-2-${process.env['TEST_SUITE_SUFFIX']}`,
       fn: testFn,
       testCaseHash: ['input'],
       testCases: genTestCases(10),
