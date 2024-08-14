@@ -20,10 +20,6 @@
   <a href="https://www.autoblocks.ai/">Home</a>
 </p>
 <p align="center">
-  <img src="assets/js-logo-128.png" width="64px">
-  <img src="assets/ts-logo-128.png" width="64px">
-</p>
-<p align="center">
   <a href="https://github.com/autoblocksai/cli/actions/workflows/ci.yml">
     <img src="https://github.com/autoblocksai/cli/actions/workflows/ci.yml/badge.svg?branch=main">
   </a>
