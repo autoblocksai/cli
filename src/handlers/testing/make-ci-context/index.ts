@@ -10,7 +10,9 @@ export async function makeCIContext(args: {
   try {
     result = await setupCIContext({ apiKey: args.apiKey });
   } catch (err) {
-    core.setFailed(`Failed to setup CI context for Autoblocks testing: ${err}`);
+    // eslint-disable-next-line no-console
+    console.error(err);
+    core.setFailed(`Failed to setup CI context for Autoblocks testing`);
     process.exit(1);
   }
 
@@ -20,6 +22,8 @@ export async function makeCIContext(args: {
       `Running in CI environment: ${JSON.stringify(result.ciContext, null, 2)}`,
     );
   } else {
+    // eslint-disable-next-line no-console
+    console.error('Failed to setup CI context for Autoblocks testing.');
     core.setFailed('Failed to setup CI context for Autoblocks testing.');
     process.exit(1);
   }
