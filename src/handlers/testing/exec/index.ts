@@ -28,7 +28,7 @@ export async function exec(args: {
     includeShareUrl: args.includeShareUrl,
   });
 
-  const ciContext = await runManager.setupCIContext();
+  const ciContextResult = await runManager.setupCIContext();
 
   let listenersCreated = false;
   renderTestProgress({
@@ -42,11 +42,11 @@ export async function exec(args: {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
-  if (ciContext) {
+  if (ciContextResult) {
     emitter.emit(EventName.CONSOLE_LOG, {
       ctx: 'cli',
       level: 'debug',
-      message: `Running in CI environment: ${JSON.stringify(ciContext, null, 2)}`,
+      message: `Running in CI environment: ${JSON.stringify(ciContextResult.ciContext, null, 2)}`,
     });
   }
 
@@ -117,11 +117,11 @@ export async function exec(args: {
           [SDKEnvironmentVariable.AUTOBLOCKS_FILTERS_TEST_SUITES]:
             args.testSuites,
           [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]:
-            ciContext?.autoblocksOverrides?.testsAndHashes,
+            ciContextResult?.ciContext?.autoblocksOverrides?.testsAndHashes,
           [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_PROMPT_REVISIONS]:
-            ciContext?.autoblocksOverrides?.promptRevisions,
+            ciContextResult?.ciContext?.autoblocksOverrides?.promptRevisions,
           [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_CONFIG_REVISIONS]:
-            ciContext?.autoblocksOverrides?.configRevisions,
+            ciContextResult?.ciContext?.autoblocksOverrides?.configRevisions,
         }),
         // will return error code as response (even if it's non-zero)
         ignoreReturnCode: true,

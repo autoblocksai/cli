@@ -202,6 +202,26 @@ const parser = yargs(hideBin(process.argv))
             port: argv.port,
           });
         },
+      )
+      .command(
+        'setup-ci-context',
+        'Setup the context for a CI test run and set the output as GitHub environment variables. Used when running Autoblocks tests in CI, without using exec.',
+        (yargs) => {
+          return yargs
+            .option('api-key', apiKeyOptions)
+            .option('slack-webhook-url', {
+              describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable`,
+              type: 'string',
+              default: variableFromEnv(AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME),
+            })
+            .help();
+        },
+        (argv) => {
+          handlers.testing.setupCIContext({
+            apiKey: argv['api-key'],
+            slackWebhookUrl: argv['slack-webhook-url'],
+          });
+        },
       );
   })
   // Populates `argv['--']` with the unparsed arguments after --

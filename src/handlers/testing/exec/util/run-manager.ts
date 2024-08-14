@@ -1,5 +1,4 @@
-import { AUTOBLOCKS_API_BASE_URL } from '../../../../util/constants';
-import { CIContext, makeCIContext } from './ci';
+import { CIContext, setupCIContext } from '../../../../util/ci';
 import { EventSchemas, EventName, emitter } from './emitter';
 import {
   type TestCaseEvent,
@@ -8,11 +7,7 @@ import {
   type TestRun,
 } from './models';
 import { postSlackMessage, postGitHubComment } from './comments';
-
-type HttpError = {
-  status: number;
-  data: unknown;
-};
+import { post } from '../../../../util/api';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 
@@ -95,100 +90,51 @@ export class RunManager {
 
   private async post<T>(path: string, body?: unknown): Promise<T> {
     const subpath = this.isCI ? '/testing/ci' : '/testing/local';
-    const resp = await fetch(`${AUTOBLOCKS_API_BASE_URL}${subpath}${path}`, {
-      method: 'POST',
-      body: body ? JSON.stringify(body) : undefined,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-      },
+    return await post({
+      path: `${subpath}${path}`,
+      apiKey: this.apiKey,
+      body,
     });
-
-    let data;
-    try {
-      data = await resp.json();
-    } catch {
-      const text = await resp.text();
-      const err: HttpError = {
-        status: resp.status,
-        data: text,
-      };
-      throw new Error(JSON.stringify(err));
-    }
-
-    if (!resp.ok) {
-      const err: HttpError = {
-        status: resp.status,
-        data,
-      };
-      throw new Error(JSON.stringify(err));
-    }
-    return data;
   }
 
   private get isCI(): boolean {
     return process.env.CI === 'true';
   }
 
-  async makeCIContext(): Promise<CIContext | undefined> {
+  async setupCIContext(): Promise<{
+    buildId: string;
+    branchId: string;
+    ciContext: CIContext;
+  } | null> {
     if (!this.isCI) {
-      return undefined;
-    }
-    if (!this.ciContext) {
-      try {
-        this.ciContext = await makeCIContext();
-      } catch (err) {
-        emitter.emit(EventName.CONSOLE_LOG, {
-          ctx: 'cli',
-          level: 'error',
-          message: `Failed to get CI context: ${err}`,
-        });
-        throw err;
-      }
-    }
-    return this.ciContext;
-  }
-
-  async setupCIContext(): Promise<CIContext | null> {
-    const ciContext = await this.makeCIContext();
-
-    if (!ciContext) {
       return null;
     }
 
-    const { id, branchId } = await this.post<{ id: string; branchId: string }>(
-      '/builds',
-      {
-        gitProvider: ciContext.gitProvider,
-        repositoryExternalId: ciContext.repoId,
-        repositoryName: ciContext.repoName,
-        repositoryHtmlUrl: ciContext.repoHtmlUrl,
-        branchExternalId: ciContext.branchId,
-        branchName: ciContext.branchName,
-        isDefaultBranch: ciContext.isDefaultBranch,
-        ciProvider: ciContext.ciProvider,
-        buildHtmlUrl: ciContext.buildHtmlUrl,
-        workflowId: ciContext.workflowId,
-        workflowName: ciContext.workflowName,
-        workflowRunNumber: ciContext.workflowRunNumber,
-        jobName: ciContext.jobName,
-        commitSha: ciContext.commitSha,
-        commitMessage: ciContext.commitMessage,
-        commitCommitterName: ciContext.commitCommitterName,
-        commitCommitterEmail: ciContext.commitCommitterEmail,
-        commitAuthorName: ciContext.commitAuthorName,
-        commitAuthorEmail: ciContext.commitAuthorEmail,
-        commitCommittedDate: ciContext.commitCommittedDate,
-        pullRequestNumber: ciContext.pullRequestNumber,
-        pullRequestTitle: ciContext.pullRequestTitle,
-        autoblocksOverrides: ciContext.autoblocksOverrides,
-      },
-    );
+    // If we already have the CI context, build ID, and branch ID, we can skip the setup
+    if (this.ciContext && this.ciBuildId && this.ciBranchId) {
+      return {
+        buildId: this.ciBuildId,
+        branchId: this.ciBranchId,
+        ciContext: this.ciContext,
+      };
+    }
 
-    this.ciBuildId = id;
-    this.ciBranchId = branchId;
-
-    return ciContext;
+    try {
+      const result = await setupCIContext({ apiKey: this.apiKey });
+      if (result) {
+        this.ciBuildId = result.buildId;
+        this.ciBranchId = result.branchId;
+        this.ciContext = result.ciContext;
+      }
+      return result;
+    } catch (err) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'error',
+        message: `Failed to setup CI context: ${err}`,
+      });
+      throw err;
+    }
   }
 
   getCIBranchId(): string | undefined {
