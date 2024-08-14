@@ -1,3 +1,4 @@
+import os
 import uuid
 import random
 import asyncio
@@ -76,7 +77,7 @@ def gen_test_cases(n: int) -> list[MyTestCase]:
 
 if __name__ == "__main__":
   run_test_suite(
-      id="python-e2e-test-suite-1",
+      id=f"python-e2e-test-suite-1-{os.environ['TEST_SUITE_SUFFIX']}",
       fn=test_fn,
       test_cases=gen_test_cases(4),
       evaluators=[
@@ -89,7 +90,7 @@ if __name__ == "__main__":
       ),
   )
   run_test_suite(
-      id="python-e2e-test-suite-2",
+      id=f"python-e2e-test-suite-2-{os.environ['TEST_SUITE_SUFFIX']}",
       fn=test_fn,
       test_cases=gen_test_cases(10),
       evaluators=[
