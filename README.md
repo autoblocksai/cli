@@ -37,7 +37,7 @@ npx autoblocks --help
 
 ## Examples
 
-See our [JavaScript](https://github.com/autoblocksai/autoblocks-examples#javascript) examples.
+See our [examples](https://github.com/autoblocksai/autoblocks-examples).
 
 ## Documentation
 
