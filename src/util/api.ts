@@ -26,6 +26,9 @@ export async function post<T>(args: {
     );
     return resp.data;
   } catch (err) {
-    throw new Error(`Failed to POST ${args.path}: ${err}`);
+    if (axios.isAxiosError(err)) {
+      throw new Error(`Failed to POST ${args.path}: ${err.toJSON()}`);
+    }
+    throw err;
   }
 }
