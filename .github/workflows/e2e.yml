@@ -14,6 +14,12 @@ on:
   schedule:
     - cron: '17 15 * * *'
 
+permissions:
+  # Allow commenting on pull requests
+  issues: write
+  pull-requests: write
+  contents: read
+
 jobs:
   py:
     name: python-e2e-${{ github.event_name }}
@@ -114,6 +120,7 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/e2e/python
           TEST_SUITE_SUFFIX: 'no-cli-runner'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
   ts:
@@ -213,6 +220,7 @@ jobs:
         working-directory: e2e/typescript
         env:
           TEST_SUITE_SUFFIX: 'no-cli-runner'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
   notify:
