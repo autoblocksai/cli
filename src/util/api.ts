@@ -1,42 +1,31 @@
 import { AUTOBLOCKS_API_BASE_URL } from './constants';
+import axios from 'axios';
+import axiosRetry from 'axios-retry';
 
-type HttpError = {
-  status: number;
-  data: unknown;
-};
+axiosRetry(axios, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+});
 
 export async function post<T>(args: {
   path: string;
   apiKey: string;
   body?: unknown;
 }): Promise<T> {
-  const resp = await fetch(`${AUTOBLOCKS_API_BASE_URL}${args.path}`, {
-    method: 'POST',
-    body: args.body ? JSON.stringify(args.body) : undefined,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${args.apiKey}`,
-    },
-  });
-
-  let data;
   try {
-    data = await resp.json();
-  } catch {
-    const text = await resp.text();
-    const err: HttpError = {
-      status: resp.status,
-      data: text,
-    };
-    throw new Error(JSON.stringify(err));
+    const resp = await axios.post<T>(
+      `${AUTOBLOCKS_API_BASE_URL}${args.path}`,
+      args.body,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${args.apiKey}`,
+        },
+        timeout: 30_000,
+      },
+    );
+    return resp.data;
+  } catch (err) {
+    throw new Error(`Failed to POST ${args.path}: ${err}`);
   }
-
-  if (!resp.ok) {
-    const err: HttpError = {
-      status: resp.status,
-      data,
-    };
-    throw new Error(JSON.stringify(err));
-  }
-  return data;
 }
