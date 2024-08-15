@@ -1,2 +1,1 @@
-git+https://github.com/autoblocksai/python-sdk.git@adam/epd-1188-python-sdk#egg=autoblocksai
-
+autoblocksai
