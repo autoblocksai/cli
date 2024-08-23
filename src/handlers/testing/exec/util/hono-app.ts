@@ -3,7 +3,7 @@ import { Hono, type Context } from 'hono';
 import { type ZodError, z } from 'zod';
 import { EventName, emitter } from './emitter';
 import { RunManager } from './run-manager';
-
+import { isAxiosError } from 'axios';
 /**
  * Server that receives requests from the SDKs
  */
@@ -11,14 +11,29 @@ export function createHonoApp(runManager: RunManager): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
-    runManager.handleUncaughtError({
-      error: {
-        name: 'HTTPError',
-        message: `${c.req.method} ${c.req.path}`,
-        stacktrace: err.stack ?? err.message,
-      },
-      ctx: 'cli',
-    });
+    if (isAxiosError(err)) {
+      const stringifiedData = err.response?.data
+        ? JSON.stringify(err.response?.data, null, 2)
+        : undefined;
+      runManager.handleUncaughtError({
+        error: {
+          name: 'HTTPError',
+          message: `${c.req.method} ${c.req.path} ${err.response?.status} ${err.response?.statusText}\n`,
+          stacktrace: stringifiedData || err.stack || err.message,
+        },
+        ctx: 'cli',
+      });
+    } else {
+      runManager.handleUncaughtError({
+        error: {
+          name: 'HTTPError',
+          message: `${c.req.method} ${c.req.path}`,
+          stacktrace: err.stack ?? err.message,
+        },
+        ctx: 'cli',
+      });
+    }
+
     return c.json('Internal Server Error', 500);
   });
 
