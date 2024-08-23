@@ -3,6 +3,7 @@ import uuid
 import random
 import asyncio
 import dataclasses
+import logging
 
 from autoblocks.testing.models import BaseTestCase
 from autoblocks.testing.models import BaseTestEvaluator
@@ -12,6 +13,9 @@ from autoblocks.testing.util import md5
 from autoblocks.testing.run import grid_search_ctx
 from autoblocks.testing.run import run_test_suite
 
+
+# Create and configure logger
+logging.basicConfig(level=logging.INFO)
 
 @dataclasses.dataclass
 class MyTestCase(BaseTestCase):
