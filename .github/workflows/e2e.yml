@@ -212,7 +212,7 @@ jobs:
         id: setup_ci_context
         run: |
           ../../bin/cli.js testing setup-ci-context
-          echo "autoblocks_build_id=${{ env.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID }}" >> $GITHUB_OUTPUT
+          echo "autoblocks_build_id=${AUTOBLOCKS_CI_TEST_RUN_BUILD_ID}" >> $GITHUB_OUTPUT
         working-directory: e2e/typescript
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
