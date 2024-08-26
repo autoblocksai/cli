@@ -40,5 +40,6 @@ export async function setupCIContext(args: {
 
   Object.entries(envVars).forEach(([key, value]) => {
     core.exportVariable(key, value);
+    core.setOutput(key, value);
   });
 }
