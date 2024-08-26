@@ -215,6 +215,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
 
+      - name: Echo CI context
+        run: echo ${{ env.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
+
       - name: Run tests in e2e/typescript
         run: npx tsx run.ts
         working-directory: e2e/typescript
