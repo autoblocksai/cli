@@ -209,18 +209,11 @@ jobs:
         run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Setup CI context
-        id: setup_ci_context
         run: ../../bin/cli.js testing setup-ci-context
         working-directory: e2e/typescript
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTOBLOCKS_API_KEY: ${{ secrets.AUTOBLOCKS_API_KEY }}
-
-      - name: Echo CI context
-        run: echo ${{ env.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID }}
-
-      - name: Echo CI context
-        run: echo ${{ steps.setup_ci_context.outputs.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID }}
 
       - name: Run tests in e2e/typescript
         run: npx tsx run.ts
