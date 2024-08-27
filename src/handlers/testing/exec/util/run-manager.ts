@@ -562,6 +562,14 @@ export class RunManager {
           usedAt: string;
         }[]
       | null;
+    assertions?:
+      | {
+          passed: boolean;
+          required: boolean;
+          criterion: string;
+          metadata?: unknown;
+        }[]
+      | null;
   }): Promise<void> {
     let passed: EvaluationPassed;
 
@@ -609,6 +617,7 @@ export class RunManager {
       threshold: args.threshold,
       metadata: args.metadata,
       revisionUsage: args.revisionUsage,
+      assertions: args.assertions,
     });
 
     this.evaluations.push({

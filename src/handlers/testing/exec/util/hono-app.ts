@@ -282,6 +282,16 @@ export function createHonoApp(runManager: RunManager): Hono {
             }),
           )
           .nullish(),
+        assertions: z
+          .array(
+            z.object({
+              passed: z.boolean(),
+              required: z.boolean(),
+              criterion: z.string(),
+              metadata: z.unknown().nullish(),
+            }),
+          )
+          .nullish(),
       }),
       handleValidationResult,
     ),
