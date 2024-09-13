@@ -11,6 +11,13 @@ import { post } from '../../../../util/api';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
 
+enum HumanReviewFieldContentType {
+  TEXT = 'text',
+  LINK = 'link',
+  HTML = 'html',
+  MARKDOWN = 'markdown',
+}
+
 /**
  * Manages the state of the current run
  */
@@ -421,8 +428,8 @@ export class RunManager {
           usedAt: string;
         }[]
       | null;
-    testCaseHumanReviewInputFields?: { name: string; value: string }[] | null;
-    testCaseHumanReviewOutputFields?: { name: string; value: string }[] | null;
+    testCaseHumanReviewInputFields?: { name: string; value: string; contentType?: HumanReviewFieldContentType }[] | null;
+    testCaseHumanReviewOutputFields?: { name: string; value: string; contentType?: HumanReviewFieldContentType }[] | null;
   }): Promise<{ resultId: string }> {
     const runId = this.legacyGetCurrentRunId({
       testExternalId: args.testExternalId,
