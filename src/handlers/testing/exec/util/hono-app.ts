@@ -2,7 +2,7 @@ import { zValidator } from '@hono/zod-validator';
 import { Hono, type Context } from 'hono';
 import { type ZodError, z } from 'zod';
 import { EventName, emitter } from './emitter';
-import { RunManager } from './run-manager';
+import { HumanReviewFieldContentType, RunManager } from './run-manager';
 import { isAxiosError } from 'axios';
 /**
  * Server that receives requests from the SDKs
@@ -212,6 +212,7 @@ export function createHonoApp(runManager: RunManager): Hono {
             z.object({
               name: z.string(),
               value: z.string(),
+              contentType: z.nativeEnum(HumanReviewFieldContentType).optional(),
             }),
           )
           .nullish(),
@@ -220,6 +221,7 @@ export function createHonoApp(runManager: RunManager): Hono {
             z.object({
               name: z.string(),
               value: z.string(),
+              contentType: z.nativeEnum(HumanReviewFieldContentType).optional(),
             }),
           )
           .nullish(),
