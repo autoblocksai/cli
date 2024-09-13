@@ -212,7 +212,7 @@ export function createHonoApp(runManager: RunManager): Hono {
             z.object({
               name: z.string(),
               value: z.string(),
-              contentType: z.enum(['text', 'link', 'html', 'markdown']).optional(),
+              contentType: z.enum(['text', 'link', 'html', 'markdown']).default("text"),
             }),
           )
           .nullish(),
@@ -221,7 +221,7 @@ export function createHonoApp(runManager: RunManager): Hono {
             z.object({
               name: z.string(),
               value: z.string(),
-              contentType: z.enum(['text', 'link', 'html', 'markdown']).optional(),
+              contentType: z.enum(['text', 'link', 'html', 'markdown']).default("text"),
             }),
           )
           .nullish(),

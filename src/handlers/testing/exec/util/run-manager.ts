@@ -428,8 +428,8 @@ export class RunManager {
           usedAt: string;
         }[]
       | null;
-    testCaseHumanReviewInputFields?: { name: string; value: string; contentType?: HumanReviewFieldContentType }[] | null;
-    testCaseHumanReviewOutputFields?: { name: string; value: string; contentType?: HumanReviewFieldContentType }[] | null;
+    testCaseHumanReviewInputFields?: { name: string; value: string; contentType: HumanReviewFieldContentType }[] | null;
+    testCaseHumanReviewOutputFields?: { name: string; value: string; contentType: HumanReviewFieldContentType }[] | null;
   }): Promise<{ resultId: string }> {
     const runId = this.legacyGetCurrentRunId({
       testExternalId: args.testExternalId,
