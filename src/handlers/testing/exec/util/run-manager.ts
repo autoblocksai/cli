@@ -432,14 +432,14 @@ export class RunManager {
       | {
           name: string;
           value: string;
-          contentType?: HumanReviewFieldContentType;
+          contentType?: HumanReviewFieldContentType | null;
         }[]
       | null;
     testCaseHumanReviewOutputFields?:
       | {
           name: string;
           value: string;
-          contentType?: HumanReviewFieldContentType;
+          contentType?: HumanReviewFieldContentType | null;
         }[]
       | null;
   }): Promise<{ resultId: string }> {
