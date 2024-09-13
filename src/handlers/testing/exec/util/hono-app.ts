@@ -212,7 +212,7 @@ export function createHonoApp(runManager: RunManager): Hono {
             z.object({
               name: z.string(),
               value: z.string(),
-              contentType: z.nativeEnum(HumanReviewFieldContentType).optional(),
+              contentType: z.nativeEnum(HumanReviewFieldContentType).nullish(),
             }),
           )
           .nullish(),
@@ -221,7 +221,7 @@ export function createHonoApp(runManager: RunManager): Hono {
             z.object({
               name: z.string(),
               value: z.string(),
-              contentType: z.nativeEnum(HumanReviewFieldContentType).optional(),
+              contentType: z.nativeEnum(HumanReviewFieldContentType).nullish(),
             }),
           )
           .nullish(),
