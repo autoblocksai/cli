@@ -9,7 +9,6 @@ import {
   makeAutoblocksCIBuildSummaryHtmlUrl,
   makeAutoblocksLocalTestResultsHtmlUrl,
   makeAutoblocksCITestResultsHtmlUrl,
-  makeAutoblocksHumanReviewHtmlUrl,
   makeAutoblocksGridSearchRunGroupHtmlUrl,
 } from '../../util/url';
 
