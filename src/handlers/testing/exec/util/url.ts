@@ -26,18 +26,6 @@ export function makeAutoblocksCITestResultsHtmlUrl(args: {
 }
 
 /**
- * Links to the human review UI for a particular test run (local or CI).
- */
-export function makeAutoblocksHumanReviewHtmlUrl(args: {
-  testExternalId: string;
-  runId: string;
-}): string {
-  const testId = encodeURIComponent(args.testExternalId);
-  const runId = encodeURIComponent(args.runId);
-  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/test/${testId}/run/${runId}/human-review`;
-}
-
-/**
  * Links to a group of runs from a grid search.
  */
 export function makeAutoblocksGridSearchRunGroupHtmlUrl(args: {

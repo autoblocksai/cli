@@ -168,13 +168,6 @@ function TestRunRow(props: {
       {/* Links */}
       <Box flexDirection="column" paddingTop={1} paddingLeft={2}>
         {resultsUrl && <ExternalLink name="Results" url={resultsUrl} />}
-        <ExternalLink
-          name="Human Review"
-          url={makeAutoblocksHumanReviewHtmlUrl({
-            testExternalId: props.runMeta.testExternalId,
-            runId: props.runMeta.id,
-          })}
-        />
         {props.runMeta.gridSearchRunGroupId && (
           <ExternalLink
             name="Grid Search"
