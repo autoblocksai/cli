@@ -417,7 +417,7 @@ export class RunManager {
     testExternalId: string;
     runId?: string;
     testCaseHash: string;
-    datasetItemId?: string;
+    datasetItemId?: string | null;
     testCaseBody: Record<string, unknown>;
     testCaseOutput?: unknown;
     testCaseDurationMs?: number | null;
