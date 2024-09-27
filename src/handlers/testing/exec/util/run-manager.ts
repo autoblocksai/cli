@@ -417,6 +417,7 @@ export class RunManager {
     testExternalId: string;
     runId?: string;
     testCaseHash: string;
+    datasetItemId?: string;
     testCaseBody: Record<string, unknown>;
     testCaseOutput?: unknown;
     testCaseDurationMs?: number | null;
@@ -454,6 +455,7 @@ export class RunManager {
         testCaseHash: args.testCaseHash,
         testCaseDurationMs: args.testCaseDurationMs,
         testCaseRevisionUsage: args.testCaseRevisionUsage,
+        datasetItemId: args.datasetItemId,
       },
     );
 
