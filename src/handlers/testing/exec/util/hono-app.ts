@@ -194,6 +194,7 @@ export function createHonoApp(runManager: RunManager): Hono {
           .nullish()
           .transform((x) => x ?? undefined),
         testCaseHash: z.string(),
+        datasetItemId: z.string().nullish(),
         testCaseBody: z.record(z.string(), z.unknown()),
         testCaseOutput: z.unknown(),
         testCaseDurationMs: z.number().min(0).nullish(),
