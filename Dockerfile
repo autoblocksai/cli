@@ -2,10 +2,20 @@ FROM node:20
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY . .
 
 RUN npm ci
 
-COPY . .
+RUN npm run build
 
-CMD ["npm", "run", "test"]
+RUN ls -la
+
+WORKDIR /app/e2e/typescript
+
+RUN npm install
+
+RUN ls -la
+
+RUN printenv
+
+# RUN ../../bin/cli.js testing setup-ci-context
