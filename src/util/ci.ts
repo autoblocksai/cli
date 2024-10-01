@@ -70,6 +70,7 @@ const zCodefreshEventSchema = z.object({
     default_branch: z.string(),
   }),
   head_commit: z.object({
+    timestamp: z.string(),
     author: z.object({
       name: z.string(),
       email: z.string(),
@@ -210,7 +211,9 @@ async function makeCodefreshCIContext(): Promise<CIContext> {
     commitAuthorEmail: parsedEvent?.head_commit.author.email ?? null,
     commitCommitterName: env.CF_COMMIT_AUTHOR,
     commitCommitterEmail: parsedEvent?.head_commit.committer.email ?? null,
-    commitCommittedDate: new Date().toISOString(),
+    commitCommittedDate: parsedEvent?.head_commit.timestamp
+      ? new Date(parsedEvent.head_commit.timestamp).toISOString()
+      : new Date().toISOString(),
     pullRequestNumber:
       env.CF_PULL_REQUEST_NUMBER !== null &&
       env.CF_PULL_REQUEST_NUMBER !== undefined
