@@ -21,3 +21,9 @@ steps:
     stage: build
     build_arguments:
       - REPO_NAME=${{CF_REPO_NAME}}
+
+  run_tests:
+    title: Running tests
+    image: '${{build_docker_image}}'
+    commands:
+      - printenv
