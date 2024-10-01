@@ -6,7 +6,6 @@ import {
   EvaluationPassed,
   type TestRun,
 } from './models';
-import { postSlackMessage, postGitHubComment } from './comments';
 import { post } from '../../../../util/api';
 
 type UncaughtError = EventSchemas[EventName.UNCAUGHT_ERROR];
@@ -693,46 +692,42 @@ export class RunManager {
       return;
     }
 
-    const runDurationMs = this.endTime.getTime() - this.startTime.getTime();
-
-    const promises: Promise<void>[] = [];
+    const promises: Promise<unknown>[] = [];
 
     if (args.slackWebhookUrl) {
-      const slackPromise = postSlackMessage({
-        webhookUrl: args.slackWebhookUrl,
-        buildId: this.ciBuildId,
-        branchId: this.ciBranchId,
-        ciContext: this.ciContext,
-        runDurationMs,
-        runs: Object.values(this.runs),
-        evaluations: this.evaluations,
-      })
-        .then(() => {
-          emitter.emit(EventName.CONSOLE_LOG, {
-            ctx: 'cli',
-            level: 'info',
-            message: 'Successfully posted message to Slack',
-          });
+      Object.values(this.runs).forEach((run) => {
+        const slackPromise = post({
+          path: `/runs/${run.runId}/slack-notification`,
+          apiKey: this.apiKey,
+          body: {
+            slackWebhookUrl: args.slackWebhookUrl,
+          },
         })
-        .catch((err) => {
-          emitter.emit(EventName.CONSOLE_LOG, {
-            ctx: 'cli',
-            level: 'warn',
-            message: `Failed to post to Slack: ${err}`,
+          .then(() => {
+            emitter.emit(EventName.CONSOLE_LOG, {
+              ctx: 'cli',
+              level: 'info',
+              message: 'Successfully posted message to Slack',
+            });
+          })
+          .catch((err) => {
+            emitter.emit(EventName.CONSOLE_LOG, {
+              ctx: 'cli',
+              level: 'warn',
+              message: `Failed to post to Slack: ${err}`,
+            });
           });
-        });
-      promises.push(slackPromise);
+        promises.push(slackPromise);
+      });
     }
 
     if (process.env.GITHUB_TOKEN) {
-      const gitHubPromise = postGitHubComment({
-        githubToken: process.env.GITHUB_TOKEN,
-        buildId: this.ciBuildId,
-        branchId: this.ciBranchId,
-        ciContext: this.ciContext,
-        runDurationMs,
-        runs: Object.values(this.runs),
-        evaluations: this.evaluations,
+      const gitHubPromise = post({
+        path: `/builds/${this.ciBuildId}/github-comment`,
+        apiKey: this.apiKey,
+        body: {
+          githubToken: process.env.GITHUB_TOKEN,
+        },
       }).catch((err) => {
         emitter.emit(EventName.CONSOLE_LOG, {
           ctx: 'cli',
