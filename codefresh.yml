@@ -16,6 +16,7 @@ steps:
     stage: test
     image: 'node:20'
     commands:
+      - 'cd cli'
       - 'ls -la'
       - 'npm ci'
       - 'npm run build'
