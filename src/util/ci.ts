@@ -50,6 +50,7 @@ const zGitHubEnvSchema = z.object({
 
 // https://codefresh.io/docs/docs/pipelines/variables/
 const zCodefreshEnvSchema = z.object({
+  CF_REPO_OWNER: z.string(),
   CF_REPO_NAME: z.string(),
   CF_BRANCH: z.string(), // branch name
   CF_PULL_REQUEST_NUMBER: z.coerce.number().nullish(),
@@ -60,6 +61,24 @@ const zCodefreshEnvSchema = z.object({
   CF_BUILD_URL: z.string(), // build URL to codefresh
   CF_COMMIT_URL: z.string(),
   CF_PIPELINE_NAME: z.string(),
+});
+
+const zCodefreshEventSchema = z.object({
+  repository: z.object({
+    full_name: z.string(),
+    html_url: z.string(),
+    default_branch: z.string(),
+  }),
+  head_commit: z.object({
+    author: z.object({
+      name: z.string(),
+      email: z.string(),
+    }),
+    committer: z.object({
+      name: z.string(),
+      email: z.string(),
+    }),
+  }),
 });
 
 const zPullRequestSchema = z.object({
@@ -154,24 +173,32 @@ async function makeCIContext(): Promise<CIContext> {
 
 async function makeCodefreshCIContext(): Promise<CIContext> {
   const env = zCodefreshEnvSchema.parse(process.env);
-  let eventRaw: unknown;
+  let parsedEvent: null | z.infer<typeof zCodefreshEventSchema> = null;
   try {
     // https://codefresh.io/docs/docs/pipelines/triggers/git-triggers/
-    eventRaw = JSON.parse(await fs.readFile(CODEFRESH_EVENT_PATH, 'utf-8'));
-    // eslint-disable-next-line no-console
-    console.log('eventRaw', JSON.stringify(eventRaw, null, 2));
+    const eventRaw = JSON.parse(
+      await fs.readFile(CODEFRESH_EVENT_PATH, 'utf-8'),
+    );
+    parsedEvent = zCodefreshEventSchema.parse(eventRaw);
   } catch {
     // eslint-disable-next-line no-console
     console.log('Failed to read event.json');
   }
 
+  const repoHtmlUrl =
+    parsedEvent?.repository.html_url ??
+    env.CF_COMMIT_URL.split(`/commit/${env.CF_REVISION}`)[0];
+  const repoName =
+    parsedEvent?.repository.full_name ??
+    `${env.CF_REPO_OWNER}/${env.CF_REPO_NAME}`;
+
   return {
     gitProvider: 'github',
     ciProvider: 'codefresh',
-    repoName: env.CF_REPO_NAME,
-    repoHtmlUrl: env.CF_COMMIT_URL,
+    repoName,
+    repoHtmlUrl,
     branchName: env.CF_BRANCH,
-    isDefaultBranch: false,
+    isDefaultBranch: env.CF_BRANCH === parsedEvent?.repository.default_branch,
     buildHtmlUrl: env.CF_BUILD_URL,
     workflowId: env.CF_PIPELINE_NAME,
     workflowName: env.CF_PIPELINE_NAME,
@@ -180,12 +207,19 @@ async function makeCodefreshCIContext(): Promise<CIContext> {
     commitSha: env.CF_REVISION,
     commitMessage: env.CF_COMMIT_MESSAGE,
     commitAuthorName: env.CF_COMMIT_AUTHOR,
-    commitAuthorEmail: null,
+    commitAuthorEmail: parsedEvent?.head_commit.author.email ?? null,
     commitCommitterName: env.CF_COMMIT_AUTHOR,
-    commitCommitterEmail: null,
+    commitCommitterEmail: parsedEvent?.head_commit.committer.email ?? null,
     commitCommittedDate: new Date().toISOString(),
-    pullRequestNumber: env.CF_PULL_REQUEST_NUMBER ?? null,
-    pullRequestTitle: env.CF_PULL_REQUEST_TITLE ?? null,
+    pullRequestNumber:
+      env.CF_PULL_REQUEST_NUMBER !== null &&
+      env.CF_PULL_REQUEST_NUMBER !== undefined
+        ? env.CF_PULL_REQUEST_NUMBER
+        : null,
+    pullRequestTitle:
+      env.CF_PULL_REQUEST_TITLE && env.CF_PULL_REQUEST_TITLE !== ''
+        ? env.CF_PULL_REQUEST_TITLE
+        : null,
     autoblocksOverrides: null,
   };
 }
