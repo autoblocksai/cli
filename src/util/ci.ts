@@ -183,7 +183,9 @@ async function makeCodefreshCIContext(): Promise<CIContext> {
     parsedEvent = zCodefreshEventSchema.parse(eventRaw);
   } catch {
     // eslint-disable-next-line no-console
-    console.log('Failed to read event.json');
+    console.warn(
+      'Failed to read event.json from GitHub webhook trigger. Using Codefresh environment variables as fallback.',
+    );
   }
 
   const repoHtmlUrl =
@@ -207,9 +209,11 @@ async function makeCodefreshCIContext(): Promise<CIContext> {
     jobName: null,
     commitSha: env.CF_REVISION,
     commitMessage: env.CF_COMMIT_MESSAGE,
-    commitAuthorName: env.CF_COMMIT_AUTHOR,
+    commitAuthorName:
+      parsedEvent?.head_commit.author.name ?? env.CF_COMMIT_AUTHOR,
     commitAuthorEmail: parsedEvent?.head_commit.author.email ?? null,
-    commitCommitterName: env.CF_COMMIT_AUTHOR,
+    commitCommitterName:
+      parsedEvent?.head_commit.committer.name ?? env.CF_COMMIT_AUTHOR,
     commitCommitterEmail: parsedEvent?.head_commit.committer.email ?? null,
     commitCommittedDate: parsedEvent?.head_commit.timestamp
       ? new Date(parsedEvent.head_commit.timestamp).toISOString()
