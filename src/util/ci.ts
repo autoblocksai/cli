@@ -4,27 +4,26 @@ import fs from 'fs/promises';
 import { post } from './api';
 
 const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
+const CODEFRESH_EVENT_PATH = '/codefresh/volume/event.json';
 
 export interface CIContext {
   gitProvider: 'github';
-  repoId: string;
   repoName: string;
   repoHtmlUrl: string;
-  branchId: string;
   branchName: string;
   isDefaultBranch: boolean;
-  ciProvider: 'github';
+  ciProvider: 'github' | 'codefresh';
   buildHtmlUrl: string;
   workflowId: string;
   workflowName: string;
-  workflowRunNumber: number;
-  jobName: string;
+  workflowRunNumber: number | null;
+  jobName: string | null;
   commitSha: string;
   commitMessage: string;
   commitCommitterName: string;
-  commitCommitterEmail: string;
+  commitCommitterEmail: string | null;
   commitAuthorName: string;
-  commitAuthorEmail: string;
+  commitAuthorEmail: string | null;
   commitCommittedDate: string;
   pullRequestNumber: number | null;
   pullRequestTitle: string | null;
@@ -47,6 +46,20 @@ const zGitHubEnvSchema = z.object({
   GITHUB_WORKFLOW_REF: z.string(),
   GITHUB_RUN_NUMBER: z.coerce.number(),
   GITHUB_JOB: z.string(),
+});
+
+// https://codefresh.io/docs/docs/pipelines/variables/
+const zCodefreshEnvSchema = z.object({
+  CF_REPO_NAME: z.string(),
+  CF_BRANCH: z.string(), // branch name
+  CF_PULL_REQUEST_NUMBER: z.coerce.number().nullish(),
+  CF_PULL_REQUEST_TITLE: z.string().nullish(),
+  CF_COMMIT_AUTHOR: z.string(), // name (not email)
+  CF_COMMIT_MESSAGE: z.string(),
+  CF_REVISION: z.string(), // commit sha
+  CF_BUILD_URL: z.string(), // build URL to codefresh
+  CF_COMMIT_URL: z.string(),
+  CF_PIPELINE_NAME: z.string(),
 });
 
 const zPullRequestSchema = z.object({
@@ -126,6 +139,58 @@ function parseWorkflowIdFromWorkflowRef(args: { workflowRef: string }): string {
 }
 
 async function makeCIContext(): Promise<CIContext> {
+  const githubEnv = zGitHubEnvSchema.safeParse(process.env);
+  if (githubEnv.success) {
+    return makeGithubCIContext();
+  }
+  const codefreshEnv = zCodefreshEnvSchema.safeParse(process.env);
+  if (codefreshEnv.success) {
+    return makeCodefreshCIContext();
+  }
+  throw new Error(
+    'Failed to make CI context. Are you using a supported CI provider? Reach out to support@autoblocks.ai for assistance.',
+  );
+}
+
+async function makeCodefreshCIContext(): Promise<CIContext> {
+  const env = zCodefreshEnvSchema.parse(process.env);
+  let eventRaw: unknown;
+  try {
+    // https://codefresh.io/docs/docs/pipelines/triggers/git-triggers/
+    eventRaw = JSON.parse(await fs.readFile(CODEFRESH_EVENT_PATH, 'utf-8'));
+    // eslint-disable-next-line no-console
+    console.log('eventRaw', JSON.stringify(eventRaw, null, 2));
+  } catch {
+    // eslint-disable-next-line no-console
+    console.log('Failed to read event.json');
+  }
+
+  return {
+    gitProvider: 'github',
+    ciProvider: 'codefresh',
+    repoName: env.CF_REPO_NAME,
+    repoHtmlUrl: env.CF_COMMIT_URL,
+    branchName: env.CF_BRANCH,
+    isDefaultBranch: false,
+    buildHtmlUrl: env.CF_BUILD_URL,
+    workflowId: env.CF_PIPELINE_NAME,
+    workflowName: env.CF_PIPELINE_NAME,
+    workflowRunNumber: null,
+    jobName: null,
+    commitSha: env.CF_REVISION,
+    commitMessage: env.CF_COMMIT_MESSAGE,
+    commitAuthorName: env.CF_COMMIT_AUTHOR,
+    commitAuthorEmail: null,
+    commitCommitterName: env.CF_COMMIT_AUTHOR,
+    commitCommitterEmail: null,
+    commitCommittedDate: new Date().toISOString(),
+    pullRequestNumber: env.CF_PULL_REQUEST_NUMBER ?? null,
+    pullRequestTitle: env.CF_PULL_REQUEST_TITLE ?? null,
+    autoblocksOverrides: null,
+  };
+}
+
+async function makeGithubCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
   const api = github.getOctokit(env.GITHUB_TOKEN);
 
@@ -150,21 +215,13 @@ async function makeCIContext(): Promise<CIContext> {
     : // Otherwise we can use the GITHUB_SHA and GITHUB_REF_NAME env vars
       { commitSha: env.GITHUB_SHA, branchName: env.GITHUB_REF_NAME };
 
-  const [{ data: commit }, { data: ref }] = await Promise.all([
-    // Get the commit via REST API since for pull requests the commit data
-    // is for the last merge commit and not the head commit
-    api.rest.git.getCommit({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      commit_sha: commitSha,
-    }),
-    // Get the branch via the REST API so we can get its internal node ID
-    api.rest.git.getRef({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      ref: `heads/${branchName}`,
-    }),
-  ]);
+  // Get the commit via REST API since for pull requests the commit data
+  // is for the last merge commit and not the head commit
+  const { data: commit } = await api.rest.git.getCommit({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    commit_sha: commitSha,
+  });
 
   let pullRequestNumber: number | null = null;
   let pullRequestTitle: string | null = null;
@@ -191,11 +248,9 @@ async function makeCIContext(): Promise<CIContext> {
 
   return {
     gitProvider: 'github',
-    repoId: repository.id,
     // full repo name including owner, e.g. 'octocat/Hello-World'
     repoName: env.GITHUB_REPOSITORY,
     repoHtmlUrl: [env.GITHUB_SERVER_URL, env.GITHUB_REPOSITORY].join('/'),
-    branchId: ref.node_id,
     branchName,
     isDefaultBranch: branchName === repository.default_branch,
     ciProvider: 'github',
@@ -236,6 +291,10 @@ export async function setupCIContext(args: { apiKey: string }): Promise<{
   ciContext: CIContext;
 } | null> {
   const ciContext = await makeCIContext();
+  // eslint-disable-next-line no-console
+  console.log('ciContext', JSON.stringify(ciContext, null, 2));
+
+  return null;
 
   if (!ciContext) {
     return null;
@@ -246,10 +305,8 @@ export async function setupCIContext(args: { apiKey: string }): Promise<{
     apiKey: args.apiKey,
     body: {
       gitProvider: ciContext.gitProvider,
-      repositoryExternalId: ciContext.repoId,
       repositoryName: ciContext.repoName,
       repositoryHtmlUrl: ciContext.repoHtmlUrl,
-      branchExternalId: ciContext.branchId,
       branchName: ciContext.branchName,
       isDefaultBranch: ciContext.isDefaultBranch,
       ciProvider: ciContext.ciProvider,

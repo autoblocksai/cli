@@ -26,10 +26,4 @@ steps:
     title: Running tests
     image: '${{build_docker_image}}'
     commands:
-      - printenv
-
-  print_event_json:
-    title: Print event JSON
-    image: '${{build_docker_image}}'
-    commands:
-      - 'cat /codefresh/volume/event.json'
+      - '../../bin/cli.js testing setup-ci-context --api-key 12345'

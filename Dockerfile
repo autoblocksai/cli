@@ -13,9 +13,3 @@ RUN ls -la
 WORKDIR /app/e2e/typescript
 
 RUN npm install
-
-RUN ls -la
-
-RUN printenv
-
-# RUN ../../bin/cli.js testing setup-ci-context
