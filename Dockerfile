@@ -8,8 +8,8 @@ RUN npm ci
 
 RUN npm run build
 
-RUN ls -la
-
 WORKDIR /app/e2e/typescript
 
 RUN npm install
+
+RUN ls -la
