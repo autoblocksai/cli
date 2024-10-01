@@ -696,13 +696,12 @@ export class RunManager {
 
     if (args.slackWebhookUrl) {
       Object.values(this.runs).forEach((run) => {
-        const slackPromise = post({
-          path: `/runs/${run.runId}/slack-notification`,
-          apiKey: this.apiKey,
-          body: {
+        const slackPromise = this.post(
+          `/runs/${run.runId}/slack-notification`,
+          {
             slackWebhookUrl: args.slackWebhookUrl,
           },
-        })
+        )
           .then(() => {
             emitter.emit(EventName.CONSOLE_LOG, {
               ctx: 'cli',
@@ -722,13 +721,12 @@ export class RunManager {
     }
 
     if (process.env.GITHUB_TOKEN) {
-      const gitHubPromise = post({
-        path: `/builds/${this.ciBuildId}/github-comment`,
-        apiKey: this.apiKey,
-        body: {
+      const gitHubPromise = this.post(
+        `/builds/${this.ciBuildId}/github-comment`,
+        {
           githubToken: process.env.GITHUB_TOKEN,
         },
-      }).catch((err) => {
+      ).catch((err) => {
         emitter.emit(EventName.CONSOLE_LOG, {
           ctx: 'cli',
           level: 'warn',
