@@ -22,4 +22,4 @@ steps:
       - 'npm run build'
       - 'cd e2e/typescript'
       - 'npm install'
-      - '../../bin/cli.js testing setup-ci-context --api-key 12345'
+      - '../../bin/cli.js testing exec -- npx tsx run.ts --api-key ${{AUTOBLOCKS_API_KEY}}'

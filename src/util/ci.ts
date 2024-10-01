@@ -328,10 +328,6 @@ export async function setupCIContext(args: { apiKey: string }): Promise<{
   ciContext: CIContext;
 } | null> {
   const ciContext = await makeCIContext();
-  // eslint-disable-next-line no-console
-  console.log('ciContext', JSON.stringify(ciContext, null, 2));
-
-  return null;
 
   if (!ciContext) {
     return null;
