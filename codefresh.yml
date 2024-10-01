@@ -1,8 +1,6 @@
 version: '1.0'
 stages:
   - prepare
-  - build
-  - list-contents
   - test
 
 steps:
@@ -13,27 +11,14 @@ steps:
     revision: '${{CF_REVISION}}'
     stage: prepare
 
-  build_docker_image:
-    title: Building Docker image
-    type: build
-    image_name: '${{CF_REPO_NAME}}'
-    working_directory: '${{CF_REPO_NAME}}'
-    tag: '${{CF_BRANCH_TAG_NORMALIZED}}'
-    dockerfile: Dockerfile
-    stage: build
-    build_arguments:
-      - REPO_NAME=${{CF_REPO_NAME}}
-
-  list_contents:
-    title: Listing contents
-    image: '${{build_docker_image}}'
-    stage: list-contents
-    commands:
-      - 'ls -la'
-
   run_tests:
     title: Running tests
     stage: test
-    image: '${{build_docker_image}}'
+    image: 'node:20'
     commands:
+      - 'ls -la'
+      - 'npm ci'
+      - 'npm run build'
+      - 'cd e2e/typescript'
+      - 'npm install'
       - '../../bin/cli.js testing setup-ci-context --api-key 12345'
