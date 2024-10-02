@@ -63,6 +63,15 @@ const zCodefreshEnvSchema = z.object({
   CF_PIPELINE_NAME: z.string(),
 });
 
+const zPullRequestSchema = z.object({
+  number: z.coerce.number(),
+  title: z.string(),
+  head: z.object({
+    ref: z.string(),
+    sha: z.string(),
+  }),
+});
+
 const zCodefreshEventSchema = z.object({
   repository: z.object({
     full_name: z.string(),
@@ -80,15 +89,7 @@ const zCodefreshEventSchema = z.object({
       email: z.string(),
     }),
   }),
-});
-
-const zPullRequestSchema = z.object({
-  number: z.coerce.number(),
-  title: z.string(),
-  head: z.object({
-    ref: z.string(),
-    sha: z.string(),
-  }),
+  pull_request: zPullRequestSchema.nullish(),
 });
 
 const zRepositorySchema = z.object({
@@ -195,6 +196,26 @@ async function makeCodefreshCIContext(): Promise<CIContext> {
     parsedEvent?.repository.full_name ??
     `${env.CF_REPO_OWNER}/${env.CF_REPO_NAME}`;
 
+  let pullRequestNumber: number | null = null;
+  if (
+    env.CF_PULL_REQUEST_NUMBER !== null &&
+    env.CF_PULL_REQUEST_NUMBER !== undefined
+  ) {
+    pullRequestNumber = env.CF_PULL_REQUEST_NUMBER;
+  } else if (parsedEvent?.pull_request) {
+    pullRequestNumber = parsedEvent.pull_request.number;
+  }
+
+  let pullRequestTitle: string | null = null;
+  if (
+    env.CF_PULL_REQUEST_TITLE !== null &&
+    env.CF_PULL_REQUEST_TITLE !== undefined
+  ) {
+    pullRequestTitle = env.CF_PULL_REQUEST_TITLE;
+  } else if (parsedEvent?.pull_request) {
+    pullRequestTitle = parsedEvent.pull_request.title;
+  }
+
   return {
     gitProvider: 'github',
     ciProvider: 'codefresh',
@@ -218,15 +239,8 @@ async function makeCodefreshCIContext(): Promise<CIContext> {
     commitCommittedDate: parsedEvent?.head_commit.timestamp
       ? new Date(parsedEvent.head_commit.timestamp).toISOString()
       : new Date().toISOString(),
-    pullRequestNumber:
-      env.CF_PULL_REQUEST_NUMBER !== null &&
-      env.CF_PULL_REQUEST_NUMBER !== undefined
-        ? env.CF_PULL_REQUEST_NUMBER
-        : null,
-    pullRequestTitle:
-      env.CF_PULL_REQUEST_TITLE && env.CF_PULL_REQUEST_TITLE !== ''
-        ? env.CF_PULL_REQUEST_TITLE
-        : null,
+    pullRequestNumber,
+    pullRequestTitle,
     autoblocksOverrides: null,
   };
 }
