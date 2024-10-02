@@ -4,27 +4,26 @@ import fs from 'fs/promises';
 import { post } from './api';
 
 const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
+const CODEFRESH_EVENT_PATH = '/codefresh/volume/event.json';
 
 export interface CIContext {
   gitProvider: 'github';
-  repoId: string;
   repoName: string;
   repoHtmlUrl: string;
-  branchId: string;
   branchName: string;
   isDefaultBranch: boolean;
-  ciProvider: 'github';
+  ciProvider: 'github' | 'codefresh';
   buildHtmlUrl: string;
   workflowId: string;
   workflowName: string;
-  workflowRunNumber: number;
-  jobName: string;
+  workflowRunNumber: number | null;
+  jobName: string | null;
   commitSha: string;
   commitMessage: string;
   commitCommitterName: string;
-  commitCommitterEmail: string;
+  commitCommitterEmail: string | null;
   commitAuthorName: string;
-  commitAuthorEmail: string;
+  commitAuthorEmail: string | null;
   commitCommittedDate: string;
   pullRequestNumber: number | null;
   pullRequestTitle: string | null;
@@ -49,6 +48,21 @@ const zGitHubEnvSchema = z.object({
   GITHUB_JOB: z.string(),
 });
 
+// https://codefresh.io/docs/docs/pipelines/variables/
+const zCodefreshEnvSchema = z.object({
+  CF_REPO_OWNER: z.string(),
+  CF_REPO_NAME: z.string(),
+  CF_BRANCH: z.string(), // branch name
+  CF_PULL_REQUEST_NUMBER: z.coerce.number().nullish(),
+  CF_PULL_REQUEST_TITLE: z.string().nullish(),
+  CF_COMMIT_AUTHOR: z.string(), // name (not email)
+  CF_COMMIT_MESSAGE: z.string(),
+  CF_REVISION: z.string(), // commit sha
+  CF_BUILD_URL: z.string(), // build URL to codefresh
+  CF_COMMIT_URL: z.string(),
+  CF_PIPELINE_NAME: z.string(),
+});
+
 const zPullRequestSchema = z.object({
   number: z.coerce.number(),
   title: z.string(),
@@ -56,6 +70,26 @@ const zPullRequestSchema = z.object({
     ref: z.string(),
     sha: z.string(),
   }),
+});
+
+const zCodefreshEventSchema = z.object({
+  repository: z.object({
+    full_name: z.string(),
+    html_url: z.string(),
+    default_branch: z.string(),
+  }),
+  head_commit: z.object({
+    timestamp: z.string(),
+    author: z.object({
+      name: z.string(),
+      email: z.string(),
+    }),
+    committer: z.object({
+      name: z.string(),
+      email: z.string(),
+    }),
+  }),
+  pull_request: zPullRequestSchema.nullish(),
 });
 
 const zRepositorySchema = z.object({
@@ -126,6 +160,92 @@ function parseWorkflowIdFromWorkflowRef(args: { workflowRef: string }): string {
 }
 
 async function makeCIContext(): Promise<CIContext> {
+  const githubEnv = zGitHubEnvSchema.safeParse(process.env);
+  if (githubEnv.success) {
+    return makeGithubCIContext();
+  }
+  const codefreshEnv = zCodefreshEnvSchema.safeParse(process.env);
+  if (codefreshEnv.success) {
+    return makeCodefreshCIContext();
+  }
+  throw new Error(
+    'Failed to make CI context. Are you using a supported CI provider? Reach out to support@autoblocks.ai for assistance.',
+  );
+}
+
+async function makeCodefreshCIContext(): Promise<CIContext> {
+  const env = zCodefreshEnvSchema.parse(process.env);
+  let parsedEvent: null | z.infer<typeof zCodefreshEventSchema> = null;
+  try {
+    // https://codefresh.io/docs/docs/pipelines/triggers/git-triggers/
+    const eventRaw = JSON.parse(
+      await fs.readFile(CODEFRESH_EVENT_PATH, 'utf-8'),
+    );
+    parsedEvent = zCodefreshEventSchema.parse(eventRaw);
+  } catch {
+    // eslint-disable-next-line no-console
+    console.warn(
+      'Failed to read event.json from GitHub webhook trigger. Using Codefresh environment variables as fallback.',
+    );
+  }
+
+  const repoHtmlUrl =
+    parsedEvent?.repository.html_url ??
+    env.CF_COMMIT_URL.split(`/commit/${env.CF_REVISION}`)[0];
+  const repoName =
+    parsedEvent?.repository.full_name ??
+    `${env.CF_REPO_OWNER}/${env.CF_REPO_NAME}`;
+
+  let pullRequestNumber: number | null = null;
+  if (
+    env.CF_PULL_REQUEST_NUMBER !== null &&
+    env.CF_PULL_REQUEST_NUMBER !== undefined
+  ) {
+    pullRequestNumber = env.CF_PULL_REQUEST_NUMBER;
+  } else if (parsedEvent?.pull_request) {
+    pullRequestNumber = parsedEvent.pull_request.number;
+  }
+
+  let pullRequestTitle: string | null = null;
+  if (
+    env.CF_PULL_REQUEST_TITLE !== null &&
+    env.CF_PULL_REQUEST_TITLE !== undefined
+  ) {
+    pullRequestTitle = env.CF_PULL_REQUEST_TITLE;
+  } else if (parsedEvent?.pull_request) {
+    pullRequestTitle = parsedEvent.pull_request.title;
+  }
+
+  return {
+    gitProvider: 'github',
+    ciProvider: 'codefresh',
+    repoName,
+    repoHtmlUrl,
+    branchName: env.CF_BRANCH,
+    isDefaultBranch: env.CF_BRANCH === parsedEvent?.repository.default_branch,
+    buildHtmlUrl: env.CF_BUILD_URL,
+    workflowId: env.CF_PIPELINE_NAME,
+    workflowName: env.CF_PIPELINE_NAME,
+    workflowRunNumber: null,
+    jobName: null,
+    commitSha: env.CF_REVISION,
+    commitMessage: env.CF_COMMIT_MESSAGE,
+    commitAuthorName:
+      parsedEvent?.head_commit.author.name ?? env.CF_COMMIT_AUTHOR,
+    commitAuthorEmail: parsedEvent?.head_commit.author.email ?? null,
+    commitCommitterName:
+      parsedEvent?.head_commit.committer.name ?? env.CF_COMMIT_AUTHOR,
+    commitCommitterEmail: parsedEvent?.head_commit.committer.email ?? null,
+    commitCommittedDate: parsedEvent?.head_commit.timestamp
+      ? new Date(parsedEvent.head_commit.timestamp).toISOString()
+      : new Date().toISOString(),
+    pullRequestNumber,
+    pullRequestTitle,
+    autoblocksOverrides: null,
+  };
+}
+
+async function makeGithubCIContext(): Promise<CIContext> {
   const env = zGitHubEnvSchema.parse(process.env);
   const api = github.getOctokit(env.GITHUB_TOKEN);
 
@@ -150,21 +270,13 @@ async function makeCIContext(): Promise<CIContext> {
     : // Otherwise we can use the GITHUB_SHA and GITHUB_REF_NAME env vars
       { commitSha: env.GITHUB_SHA, branchName: env.GITHUB_REF_NAME };
 
-  const [{ data: commit }, { data: ref }] = await Promise.all([
-    // Get the commit via REST API since for pull requests the commit data
-    // is for the last merge commit and not the head commit
-    api.rest.git.getCommit({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      commit_sha: commitSha,
-    }),
-    // Get the branch via the REST API so we can get its internal node ID
-    api.rest.git.getRef({
-      owner: github.context.repo.owner,
-      repo: github.context.repo.repo,
-      ref: `heads/${branchName}`,
-    }),
-  ]);
+  // Get the commit via REST API since for pull requests the commit data
+  // is for the last merge commit and not the head commit
+  const { data: commit } = await api.rest.git.getCommit({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    commit_sha: commitSha,
+  });
 
   let pullRequestNumber: number | null = null;
   let pullRequestTitle: string | null = null;
@@ -191,11 +303,9 @@ async function makeCIContext(): Promise<CIContext> {
 
   return {
     gitProvider: 'github',
-    repoId: repository.id,
     // full repo name including owner, e.g. 'octocat/Hello-World'
     repoName: env.GITHUB_REPOSITORY,
     repoHtmlUrl: [env.GITHUB_SERVER_URL, env.GITHUB_REPOSITORY].join('/'),
-    branchId: ref.node_id,
     branchName,
     isDefaultBranch: branchName === repository.default_branch,
     ciProvider: 'github',
@@ -246,10 +356,8 @@ export async function setupCIContext(args: { apiKey: string }): Promise<{
     apiKey: args.apiKey,
     body: {
       gitProvider: ciContext.gitProvider,
-      repositoryExternalId: ciContext.repoId,
       repositoryName: ciContext.repoName,
       repositoryHtmlUrl: ciContext.repoHtmlUrl,
-      branchExternalId: ciContext.branchId,
       branchName: ciContext.branchName,
       isDefaultBranch: ciContext.isDefaultBranch,
       ciProvider: ciContext.ciProvider,
