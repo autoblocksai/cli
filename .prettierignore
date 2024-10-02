@@ -4,4 +4,3 @@ CODEOWNERS
 *.sh
 *.txt
 .gitignore
-Dockerfile
