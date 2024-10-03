@@ -104,7 +104,7 @@ export class RunManager {
   }
 
   private get isCI(): boolean {
-    return process.env.CI === 'true';
+    return process.env.CI?.toLowerCase() === 'true';
   }
 
   async setupCIContext(): Promise<{
@@ -131,6 +131,15 @@ export class RunManager {
         this.ciBuildId = result.buildId;
         this.ciBranchId = result.branchId;
         this.ciContext = result.ciContext;
+      }
+      if (!this.getCIBuildId()) {
+        throw new Error('ciBuildId is undefined');
+      }
+      if (!this.getCIBranchId()) {
+        throw new Error('ciBranchId is undefined');
+      }
+      if (!this.ciContext) {
+        throw new Error('ciContext is undefined');
       }
       return result;
     } catch (err) {
