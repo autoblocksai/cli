@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { CIContext, setupCIContext } from '../../../../util/ci';
 import { EventSchemas, EventName, emitter } from './emitter';
 import {
@@ -729,11 +730,17 @@ export class RunManager {
       });
     }
 
-    if (process.env.GITHUB_TOKEN) {
+    const githubToken = z
+      .string()
+      .trim()
+      .min(1)
+      .safeParse(process.env.GITHUB_TOKEN);
+
+    if (githubToken.success) {
       const gitHubPromise = this.post(
         `/builds/${this.ciBuildId}/github-comment`,
         {
-          githubToken: process.env.GITHUB_TOKEN,
+          githubToken: githubToken.data,
         },
       )
         .then(() => {
@@ -751,6 +758,18 @@ export class RunManager {
           });
         });
       promises.push(gitHubPromise);
+    } else if (process.env.GITHUB_TOKEN) {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'warn',
+        message: 'Failed to parse GITHUB_TOKEN, skipping GitHub comment.',
+      });
+    } else {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'info',
+        message: 'GITHUB_TOKEN not found, skipping GitHub comment.',
+      });
     }
 
     await Promise.allSettled(promises);
