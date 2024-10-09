@@ -732,8 +732,8 @@ export class RunManager {
 
     const githubToken = z
       .string()
-      .min(1)
       .trim()
+      .min(1)
       .safeParse(process.env.GITHUB_TOKEN);
 
     if (githubToken.success) {
