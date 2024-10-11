@@ -98,12 +98,14 @@ function TestRunRow(props: {
     if (!process.env.CI) {
       return makeAutoblocksLocalTestResultsHtmlUrl({
         testExternalId: props.runMeta.testExternalId,
+        runId: props.runMeta.id,
       });
     }
     if (props.ciBranchId) {
       return makeAutoblocksCITestResultsHtmlUrl({
         testExternalId: props.runMeta.testExternalId,
         branchId: props.ciBranchId,
+        runId: props.runMeta.id,
       });
     }
     return null;
