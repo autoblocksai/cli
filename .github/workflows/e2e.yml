@@ -47,6 +47,16 @@ jobs:
       - name: Build CLI
         run: npm run build
 
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Create and activate virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+
       - name: Install dependencies in e2e/python
         run: pip install -r requirements.txt
         working-directory: e2e/python
@@ -94,6 +104,11 @@ jobs:
 
       - name: Build CLI
         run: npm run build
+
+      - name: Create and activate virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
 
       - name: Install dependencies in e2e/python
         run: pip install -r requirements.txt
