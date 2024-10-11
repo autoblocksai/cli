@@ -7,22 +7,29 @@ export function makeAutoblocksCIBuildSummaryHtmlUrl(args: {
   branchId: string;
   buildId: string;
 }): string {
-  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/ci?branchId=${args.branchId}&buildId=${args.buildId}`;
+  const branchId = encodeURIComponent(args.branchId);
+  const buildId = encodeURIComponent(args.buildId);
+  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/regression?branchId=${branchId}&buildId=${buildId}`;
 }
 
 export function makeAutoblocksLocalTestResultsHtmlUrl(args: {
   testExternalId: string;
+  runId: string;
 }): string {
-  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/local/test/${encodeURIComponent(args.testExternalId)}`;
+  const testId = encodeURIComponent(args.testExternalId);
+  const runId = encodeURIComponent(args.runId);
+  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/experiments/${testId}/inspect-run?baselineRunId=${runId}`;
 }
 
 export function makeAutoblocksCITestResultsHtmlUrl(args: {
   testExternalId: string;
   branchId: string;
+  runId: string;
 }): string {
   const testId = encodeURIComponent(args.testExternalId);
   const branchId = encodeURIComponent(args.branchId);
-  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/testing/ci/test/${testId}/branch/${branchId}`;
+  const runId = encodeURIComponent(args.runId);
+  return `${AUTOBLOCKS_WEBAPP_BASE_URL}/regression/${testId}/branch/${branchId}/inspect-run?baselineRunId=${runId}`;
 }
 
 /**
