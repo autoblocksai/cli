@@ -9,6 +9,7 @@ import {
   AUTOBLOCKS_WEBAPP_BASE_URL,
   AUTOBLOCKS_API_KEY_NAME,
   AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME,
+  AUTOBLOCKS_TEST_RUN_MESSAGE_NAME,
 } from './util/constants';
 import fs from 'fs';
 
@@ -127,6 +128,7 @@ const parser = yargs(hideBin(process.argv))
               alias: 'm',
               describe: 'Description for this test run',
               type: 'string',
+              default: variableFromEnv(AUTOBLOCKS_TEST_RUN_MESSAGE_NAME),
             })
             .option('test-suites', {
               alias: 'ts',
