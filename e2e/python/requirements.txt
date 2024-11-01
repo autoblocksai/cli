@@ -1,1 +1,1 @@
-autoblocksai
+autoblocksai @ git+https://github.com/autoblocksai/python-sdk.git@129f0aac927eae94a45afe0e5a11f839e0c2ba68
