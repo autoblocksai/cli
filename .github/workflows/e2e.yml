@@ -124,8 +124,7 @@ jobs:
       # we only want to post to Slack on scheduled runs and not on
       # every push or pull request.
       - name: Set Slack webhook URL
-        if: github.event_name == 'schedule'
-        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.AUTOBLOCKS_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
+        run: echo "AUTOBLOCKS_SLACK_WEBHOOK_URL=${{ secrets.ADAM_TEST_SLACK_WEBHOOK_URL }}" >> $GITHUB_ENV
 
       - name: Setup CI context
         run: ../../bin/cli.js testing setup-ci-context
