@@ -684,15 +684,13 @@ export class RunManager {
       !this.ciBranchId ||
       !this.ciBuildId ||
       !this.ciContext ||
-      !this.endTime ||
-      this.evaluations.length === 0
+      !this.endTime
     ) {
       const nameToMissing = {
         ciBranchId: !this.ciBranchId,
         ciBuildId: !this.ciBuildId,
         ciContext: !this.ciContext,
         endTime: !this.endTime,
-        evaluations: this.evaluations.length === 0,
       };
       emitter.emit(EventName.CONSOLE_LOG, {
         ctx: 'cli',
