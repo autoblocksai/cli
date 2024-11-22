@@ -1,6 +1,7 @@
 import { SDKEnvironmentVariable, makeSDKEnvVars } from '../../../util/sdk-env';
 import * as core from '@actions/core';
 import { setupCIContext as setupCIContextUtil } from '../../../util/ci';
+import { execSync } from 'child_process';
 
 export async function setupCIContext(args: {
   apiKey: string;
@@ -37,9 +38,26 @@ export async function setupCIContext(args: {
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_CONFIG_REVISIONS]:
       result.ciContext.autoblocksOverrides?.configRevisions,
   });
-
-  Object.entries(envVars).forEach(([key, value]) => {
-    core.exportVariable(key, value);
-    core.setOutput(key, value);
-  });
+  if (result.ciContext.ciProvider === 'github') {
+    Object.entries(envVars).forEach(([key, value]) => {
+      core.exportVariable(key, value);
+      core.setOutput(key, value);
+    });
+  } else if (result.ciContext.ciProvider === 'codefresh') {
+    Object.entries(envVars).forEach(([key, value]) => {
+      // This has to be done in a step before the tests are run
+      // https://codefresh.io/docs/docs/pipelines/variables/#exporting-variables-with-cf_export
+      try {
+        execSync(`cf_export ${key}=${value}`);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`Failed to set environment variable ${key}: ${err}`);
+      }
+    });
+  } else {
+    // eslint-disable-next-line no-console
+    console.error(
+      'Unsupported CI provider. Could not set environment variables.',
+    );
+  }
 }
