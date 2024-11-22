@@ -47,7 +47,12 @@ export async function setupCIContext(args: {
     Object.entries(envVars).forEach(([key, value]) => {
       // This has to be done in a step before the tests are run
       // https://codefresh.io/docs/docs/pipelines/variables/#exporting-variables-with-cf_export
-      execSync(`cf_export ${key}=${value}`);
+      try {
+        execSync(`cf_export ${key}=${value}`);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`Failed to set environment variable ${key}: ${err}`);
+      }
     });
   } else {
     // eslint-disable-next-line no-console
