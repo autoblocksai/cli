@@ -45,6 +45,8 @@ export async function setupCIContext(args: {
     });
   } else if (result.ciContext.ciProvider === 'codefresh') {
     Object.entries(envVars).forEach(([key, value]) => {
+      // This has to be done in a step before the tests are run
+      // https://codefresh.io/docs/docs/pipelines/variables/#exporting-variables-with-cf_export
       execSync(`cf_export ${key}=${value}`);
     });
   } else {
