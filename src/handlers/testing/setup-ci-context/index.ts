@@ -1,6 +1,7 @@
 import { SDKEnvironmentVariable, makeSDKEnvVars } from '../../../util/sdk-env';
 import * as core from '@actions/core';
 import { setupCIContext as setupCIContextUtil } from '../../../util/ci';
+import { execSync } from 'child_process';
 
 export async function setupCIContext(args: {
   apiKey: string;
@@ -37,9 +38,19 @@ export async function setupCIContext(args: {
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_CONFIG_REVISIONS]:
       result.ciContext.autoblocksOverrides?.configRevisions,
   });
-
-  Object.entries(envVars).forEach(([key, value]) => {
-    core.exportVariable(key, value);
-    core.setOutput(key, value);
-  });
+  if (result.ciContext.ciProvider === 'github') {
+    Object.entries(envVars).forEach(([key, value]) => {
+      core.exportVariable(key, value);
+      core.setOutput(key, value);
+    });
+  } else if (result.ciContext.ciProvider === 'codefresh') {
+    Object.entries(envVars).forEach(([key, value]) => {
+      execSync(`cf_export ${key}=${value}`);
+    });
+  } else {
+    // eslint-disable-next-line no-console
+    console.error(
+      'Unsupported CI provider. Could not set environment variables.',
+    );
+  }
 }
