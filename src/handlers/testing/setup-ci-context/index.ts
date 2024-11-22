@@ -1,4 +1,4 @@
-import { SDKEnvironmentVariable, makeSDKEnvVars } from '../../../util/sdk-env';
+import { SDKEnvironmentVariable } from '../../../util/sdk-env';
 import * as core from '@actions/core';
 import { setupCIContext as setupCIContextUtil } from '../../../util/ci';
 import { execSync } from 'child_process';
@@ -28,7 +28,8 @@ export async function setupCIContext(args: {
     core.setFailed('Failed to setup CI context for Autoblocks testing.');
     process.exit(1);
   }
-  const envVars = makeSDKEnvVars({
+
+  const envVars = {
     [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID]: result.buildId,
     [SDKEnvironmentVariable.AUTOBLOCKS_SLACK_WEBHOOK_URL]: args.slackWebhookUrl,
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]:
@@ -37,7 +38,8 @@ export async function setupCIContext(args: {
       result.ciContext.autoblocksOverrides?.promptRevisions,
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_CONFIG_REVISIONS]:
       result.ciContext.autoblocksOverrides?.configRevisions,
-  });
+  };
+
   if (result.ciContext.ciProvider === 'github') {
     Object.entries(envVars).forEach(([key, value]) => {
       core.exportVariable(key, value);
