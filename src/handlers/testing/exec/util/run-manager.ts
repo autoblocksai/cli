@@ -738,7 +738,7 @@ export class RunManager {
       .string()
       .trim()
       .optional()
-      .safeParse(process.env.DISABLE_GITHUB_COMMENT);
+      .safeParse(process.env.AUTOBLOCKS_DISABLE_GITHUB_COMMENT);
 
     if (disableGithubComment.success && disableGithubComment.data === '1') {
       emitter.emit(EventName.CONSOLE_LOG, {
