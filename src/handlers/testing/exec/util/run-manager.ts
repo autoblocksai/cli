@@ -734,7 +734,19 @@ export class RunManager {
       .min(1)
       .safeParse(process.env.GITHUB_TOKEN);
 
-    if (githubToken.success) {
+    const disableGithubComment = z
+      .string()
+      .trim()
+      .optional()
+      .safeParse(process.env.DISABLE_GITHUB_COMMENT);
+
+    if (disableGithubComment.success && disableGithubComment.data === '1') {
+      emitter.emit(EventName.CONSOLE_LOG, {
+        ctx: 'cli',
+        level: 'info',
+        message: 'GitHub comment disabled, skipping GitHub comment.',
+      });
+    } else if (githubToken.success) {
       const gitHubPromise = this.post(
         `/builds/${this.ciBuildId}/github-comment`,
         {
