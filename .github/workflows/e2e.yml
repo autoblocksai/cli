@@ -30,11 +30,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # For debugging purposes
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
+      # # For debugging purposes
+      # - name: Dump GitHub context
+      #   env:
+      #     GITHUB_CONTEXT: ${{ toJson(github) }}
+      #   run: echo "$GITHUB_CONTEXT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -88,11 +88,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # For debugging purposes
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
+      # # For debugging purposes
+      # - name: Dump GitHub context
+      #   env:
+      #     GITHUB_CONTEXT: ${{ toJson(github) }}
+      #   run: echo "$GITHUB_CONTEXT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -152,11 +152,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # For debugging purposes
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
+      # # For debugging purposes
+      # - name: Dump GitHub context
+      #   env:
+      #     GITHUB_CONTEXT: ${{ toJson(github) }}
+      #   run: echo "$GITHUB_CONTEXT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -199,11 +199,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # For debugging purposes
-      - name: Dump GitHub context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"
+      # # For debugging purposes
+      # - name: Dump GitHub context
+      #   env:
+      #     GITHUB_CONTEXT: ${{ toJson(github) }}
+      #   run: echo "$GITHUB_CONTEXT"
 
       - name: Setup Node
         uses: actions/setup-node@v4
