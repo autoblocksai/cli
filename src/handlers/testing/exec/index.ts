@@ -113,6 +113,8 @@ export async function exec(args: {
       execCommand(args.command, args.commandArgs, {
         env: makeSDKEnvVars({
           [SDKEnvironmentVariable.AUTOBLOCKS_API_KEY]: args.apiKey,
+          [SDKEnvironmentVariable.AUTOBLOCKS_V2_CI_TEST_RUN_BUILD_ID]:
+            ciContextResult?.buildId,
           [SDKEnvironmentVariable.AUTOBLOCKS_CLI_SERVER_ADDRESS]: serverAddress,
           [SDKEnvironmentVariable.AUTOBLOCKS_FILTERS_TEST_SUITES]:
             args.testSuites,

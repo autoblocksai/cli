@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import github from '@actions/github';
 import fs from 'fs/promises';
-import { post } from './api';
+import { post, postV2 } from './api';
 
 const AUTOBLOCKS_OVERRIDES_INPUT_NAME = 'autoblocks-overrides';
 const CODEFRESH_EVENT_PATH = '/codefresh/volume/event.json';
@@ -340,48 +340,109 @@ async function makeGithubCIContext(): Promise<CIContext> {
 /**
  * Creates a new CI build on Autoblocks and returns the build ID, branch ID, and CI context.
  */
-export async function setupCIContext(args: { apiKey: string }): Promise<{
-  buildId: string;
-  branchId: string;
+export async function setupCIContext(args: {
+  apiKey?: string;
+  apiKeyV2?: string;
+}): Promise<{
   ciContext: CIContext;
+  v1?: {
+    buildId: string;
+    branchId: string;
+  };
+  v2?: {
+    buildId: string;
+    branchId: string;
+  };
 } | null> {
   const ciContext = await makeCIContext();
 
   if (!ciContext) {
     return null;
   }
-
-  const { id, branchId } = await post<{ id: string; branchId: string }>({
-    path: '/testing/ci/builds',
-    apiKey: args.apiKey,
-    body: {
-      gitProvider: ciContext.gitProvider,
-      repositoryName: ciContext.repoName,
-      repositoryHtmlUrl: ciContext.repoHtmlUrl,
-      branchName: ciContext.branchName,
-      isDefaultBranch: ciContext.isDefaultBranch,
-      ciProvider: ciContext.ciProvider,
-      buildHtmlUrl: ciContext.buildHtmlUrl,
-      workflowId: ciContext.workflowId,
-      workflowName: ciContext.workflowName,
-      workflowRunNumber: ciContext.workflowRunNumber,
-      jobName: ciContext.jobName,
-      commitSha: ciContext.commitSha,
-      commitMessage: ciContext.commitMessage,
-      commitCommitterName: ciContext.commitCommitterName,
-      commitCommitterEmail: ciContext.commitCommitterEmail,
-      commitAuthorName: ciContext.commitAuthorName,
-      commitAuthorEmail: ciContext.commitAuthorEmail,
-      commitCommittedDate: ciContext.commitCommittedDate,
-      pullRequestNumber: ciContext.pullRequestNumber,
-      pullRequestTitle: ciContext.pullRequestTitle,
-      autoblocksOverrides: ciContext.autoblocksOverrides,
-    },
-  });
-
-  return {
-    buildId: id,
-    branchId,
+  const returnValue: {
+    ciContext: CIContext;
+    v1?: {
+      buildId: string;
+      branchId: string;
+    };
+    v2?: {
+      buildId: string;
+      branchId: string;
+    };
+  } = {
     ciContext,
+    v1: undefined,
+    v2: undefined,
   };
+  if (args.apiKey) {
+    const { id, branchId } = await post<{ id: string; branchId: string }>({
+      path: '/testing/ci/builds',
+      apiKey: args.apiKey,
+      body: {
+        gitProvider: ciContext.gitProvider,
+        repositoryName: ciContext.repoName,
+        repositoryHtmlUrl: ciContext.repoHtmlUrl,
+        branchName: ciContext.branchName,
+        isDefaultBranch: ciContext.isDefaultBranch,
+        ciProvider: ciContext.ciProvider,
+        buildHtmlUrl: ciContext.buildHtmlUrl,
+        workflowId: ciContext.workflowId,
+        workflowName: ciContext.workflowName,
+        workflowRunNumber: ciContext.workflowRunNumber,
+        jobName: ciContext.jobName,
+        commitSha: ciContext.commitSha,
+        commitMessage: ciContext.commitMessage,
+        commitCommitterName: ciContext.commitCommitterName,
+        commitCommitterEmail: ciContext.commitCommitterEmail,
+        commitAuthorName: ciContext.commitAuthorName,
+        commitAuthorEmail: ciContext.commitAuthorEmail,
+        commitCommittedDate: ciContext.commitCommittedDate,
+        pullRequestNumber: ciContext.pullRequestNumber,
+        pullRequestTitle: ciContext.pullRequestTitle,
+        autoblocksOverrides: ciContext.autoblocksOverrides,
+      },
+    });
+
+    returnValue.v1 = {
+      buildId: id,
+      branchId,
+    };
+  }
+
+  if (args.apiKeyV2) {
+    const { id, branchId } = await postV2<{ id: string; branchId: string }>({
+      path: '/testing/builds',
+      apiKey: args.apiKeyV2,
+      body: {
+        gitProvider: ciContext.gitProvider,
+        repositoryName: ciContext.repoName,
+        repositoryHtmlUrl: ciContext.repoHtmlUrl,
+        branchName: ciContext.branchName,
+        isDefaultBranch: ciContext.isDefaultBranch,
+        ciProvider: ciContext.ciProvider,
+        buildHtmlUrl: ciContext.buildHtmlUrl,
+        workflowId: ciContext.workflowId,
+        workflowName: ciContext.workflowName,
+        workflowRunNumber: ciContext.workflowRunNumber,
+        jobName: ciContext.jobName,
+        commitSha: ciContext.commitSha,
+        commitMessage: ciContext.commitMessage,
+        commitCommitterName: ciContext.commitCommitterName,
+        commitCommitterEmail: ciContext.commitCommitterEmail,
+        commitAuthorName: ciContext.commitAuthorName,
+        commitAuthorEmail: ciContext.commitAuthorEmail,
+        commitCommittedDate: ciContext.commitCommittedDate,
+        pullRequestNumber: ciContext.pullRequestNumber,
+        pullRequestTitle: ciContext.pullRequestTitle,
+        autoblocksOverrides: ciContext.autoblocksOverrides,
+      },
+    });
+
+    returnValue.v2 = {
+      buildId: id,
+      branchId,
+    };
+  }
+
+  return returnValue;
 }
