@@ -128,9 +128,9 @@ export class RunManager {
 
     try {
       const result = await setupCIContext({ apiKey: this.apiKey });
-      if (result) {
-        this.ciBuildId = result.buildId;
-        this.ciBranchId = result.branchId;
+      if (result && result.v1) {
+        this.ciBuildId = result.v1.buildId;
+        this.ciBranchId = result.v1.branchId;
         this.ciContext = result.ciContext;
       }
       if (!this.getCIBuildId()) {
@@ -142,7 +142,14 @@ export class RunManager {
       if (!this.ciContext) {
         throw new Error('ciContext is undefined');
       }
-      return result;
+      if (!result?.v1) {
+        return null;
+      }
+      return {
+        buildId: result.v1.buildId,
+        branchId: result.v1.branchId,
+        ciContext: result.ciContext,
+      };
     } catch (err) {
       emitter.emit(EventName.CONSOLE_LOG, {
         ctx: 'cli',

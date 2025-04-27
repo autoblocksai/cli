@@ -10,6 +10,8 @@ import {
   AUTOBLOCKS_API_KEY_NAME,
   AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME,
   AUTOBLOCKS_TEST_RUN_MESSAGE_NAME,
+  AUTOBLOCKS_V2_API_KEY_NAME,
+  AUTOBLOCKS_V2_WEBAPP_BASE_URL,
 } from './util/constants';
 import fs from 'fs';
 
@@ -68,15 +70,6 @@ const variableFromEnv = (variableName: string): string | undefined => {
   return undefined;
 };
 
-// The newline at the top of these messages is intentional;
-// it gives separation between the error message shown by
-// yargs and this one.
-const apiKeyMissingErrorMessage = `
-Autoblocks API key is required.
-Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .env file, or the --api-key option.
-
-You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`;
-
 const makeTestingCommandNotFoundErrorMessage = (command: string) => `
 No command found. Provide a command following '--'. For example:
 
@@ -105,7 +98,12 @@ const apiKeyOptions = {
   describe: `Autoblocks API key. Can be set via the ${AUTOBLOCKS_API_KEY_NAME} environment variable`,
   type: 'string',
   default: variableFromEnv(AUTOBLOCKS_API_KEY_NAME),
-  demandOption: apiKeyMissingErrorMessage,
+} as const;
+
+const apiKeyV2Options = {
+  describe: `Autoblocks V2 API key. Can be set via the ${AUTOBLOCKS_V2_API_KEY_NAME} environment variable`,
+  type: 'string',
+  default: variableFromEnv(AUTOBLOCKS_V2_API_KEY_NAME),
 } as const;
 
 const portOptions = {
@@ -114,6 +112,20 @@ const portOptions = {
   type: 'number',
   default: 5555,
 } as const;
+
+const validateApiKeys = (argv: yargs.Arguments) => {
+  if (!argv['api-key'] && !argv['api-key-v2']) {
+    throw new Error(`
+Either an Autoblocks API key or V2 API key is required.
+Provide one via:
+- The ${AUTOBLOCKS_API_KEY_NAME} or ${AUTOBLOCKS_V2_API_KEY_NAME} environment variables
+- A .env file
+- The --api-key or --api-key-v2 options
+
+You can get your V1 API keys from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys
+You can get your V2 API keys from ${AUTOBLOCKS_V2_WEBAPP_BASE_URL}/settings/api-keys`);
+  }
+};
 
 const parser = yargs(hideBin(process.argv))
   .command('testing', 'Autoblocks Testing', (yargs) => {
@@ -124,6 +136,7 @@ const parser = yargs(hideBin(process.argv))
         (yargs) => {
           return yargs
             .option('api-key', apiKeyOptions)
+            .option('api-key-v2', apiKeyV2Options)
             .option('message', {
               alias: 'm',
               describe: 'Description for this test run',
@@ -157,6 +170,13 @@ const parser = yargs(hideBin(process.argv))
             .help();
         },
         (argv) => {
+          if (!argv['api-key']) {
+            throw new Error(`
+Autoblocks API key is required.
+Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .env file, or the --api-key option.
+
+You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`);
+          }
           const { command, commandArgs } = parseCommandFromArgv({
             command: 'exec',
             argv,
@@ -191,6 +211,13 @@ const parser = yargs(hideBin(process.argv))
             .help();
         },
         (argv) => {
+          if (!argv['api-key']) {
+            throw new Error(`
+Autoblocks API key is required.
+Provide it via the ${AUTOBLOCKS_API_KEY_NAME} environment variable, within a .env file, or the --api-key option.
+
+You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`);
+          }
           const { command, commandArgs } = parseCommandFromArgv({
             command: 'align',
             argv,
@@ -211,6 +238,7 @@ const parser = yargs(hideBin(process.argv))
         (yargs) => {
           return yargs
             .option('api-key', apiKeyOptions)
+            .option('api-key-v2', apiKeyV2Options)
             .option('slack-webhook-url', {
               describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable`,
               type: 'string',
@@ -219,8 +247,10 @@ const parser = yargs(hideBin(process.argv))
             .help();
         },
         (argv) => {
+          validateApiKeys(argv);
           handlers.testing.setupCIContext({
             apiKey: argv['api-key'],
+            apiKeyV2: argv['api-key-v2'],
             slackWebhookUrl: argv['slack-webhook-url'],
           });
         },

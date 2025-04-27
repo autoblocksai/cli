@@ -4,12 +4,16 @@ import { setupCIContext as setupCIContextUtil } from '../../../util/ci';
 import { execSync } from 'child_process';
 
 export async function setupCIContext(args: {
-  apiKey: string;
+  apiKey?: string;
+  apiKeyV2?: string;
   slackWebhookUrl?: string;
 }) {
   let result;
   try {
-    result = await setupCIContextUtil({ apiKey: args.apiKey });
+    result = await setupCIContextUtil({
+      apiKey: args.apiKey,
+      apiKeyV2: args.apiKeyV2,
+    });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -30,7 +34,10 @@ export async function setupCIContext(args: {
   }
 
   const envVars = {
-    [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID]: result.buildId,
+    [SDKEnvironmentVariable.AUTOBLOCKS_CI_TEST_RUN_BUILD_ID]:
+      result.v1?.buildId,
+    [SDKEnvironmentVariable.AUTOBLOCKS_V2_CI_TEST_RUN_BUILD_ID]:
+      result.v2?.buildId,
     [SDKEnvironmentVariable.AUTOBLOCKS_SLACK_WEBHOOK_URL]: args.slackWebhookUrl,
     [SDKEnvironmentVariable.AUTOBLOCKS_OVERRIDES_TESTS_AND_HASHES]:
       result.ciContext.autoblocksOverrides?.testsAndHashes,
