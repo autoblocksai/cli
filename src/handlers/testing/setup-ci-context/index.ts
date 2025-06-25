@@ -7,12 +7,14 @@ export async function setupCIContext(args: {
   apiKey?: string;
   apiKeyV2?: string;
   slackWebhookUrl?: string;
+  apiEndpointV2?: string;
 }) {
   let result;
   try {
     result = await setupCIContextUtil({
       apiKey: args.apiKey,
       apiKeyV2: args.apiKeyV2,
+      apiEndpointV2: args.apiEndpointV2,
     });
   } catch (err) {
     // eslint-disable-next-line no-console
