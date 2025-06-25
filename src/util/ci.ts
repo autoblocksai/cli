@@ -343,6 +343,7 @@ async function makeGithubCIContext(): Promise<CIContext> {
 export async function setupCIContext(args: {
   apiKey?: string;
   apiKeyV2?: string;
+  apiEndpointV2?: string;
 }): Promise<{
   ciContext: CIContext;
   v1?: {

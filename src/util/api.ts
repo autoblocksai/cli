@@ -36,13 +36,14 @@ export async function post<T>(args: {
 }
 
 export async function postV2<T>(args: {
+  apiEndpoint?: string;
   path: string;
   apiKey: string;
   body?: unknown;
 }): Promise<T> {
   return await requestSemaphore.run(async () => {
     const resp = await axios.post<T>(
-      `${AUTOBLOCKS_V2_API_BASE_URL}${args.path}`,
+      `${args.apiEndpoint || AUTOBLOCKS_V2_API_BASE_URL}${args.path}`,
       args.body,
       {
         headers: {

@@ -12,6 +12,7 @@ import {
   AUTOBLOCKS_TEST_RUN_MESSAGE_NAME,
   AUTOBLOCKS_V2_API_KEY_NAME,
   AUTOBLOCKS_V2_WEBAPP_BASE_URL,
+  AUTOBLOCKS_V2_API_ENDPOINT,
 } from './util/constants';
 import fs from 'fs';
 
@@ -104,6 +105,12 @@ const apiKeyV2Options = {
   describe: `Autoblocks V2 API key. Can be set via the ${AUTOBLOCKS_V2_API_KEY_NAME} environment variable`,
   type: 'string',
   default: variableFromEnv(AUTOBLOCKS_V2_API_KEY_NAME),
+} as const;
+
+const apiEndpointV2Options = {
+  describe: `Autoblocks V2 API endpoint. Can be set via the ${AUTOBLOCKS_V2_API_ENDPOINT} environment variable`,
+  type: 'string',
+  default: variableFromEnv(AUTOBLOCKS_V2_API_ENDPOINT),
 } as const;
 
 const portOptions = {
@@ -239,6 +246,7 @@ You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`);
           return yargs
             .option('api-key', apiKeyOptions)
             .option('api-key-v2', apiKeyV2Options)
+            .option('api-endpoint-v2', apiEndpointV2Options)
             .option('slack-webhook-url', {
               describe: `Slack webhook URL where results are posted. Can be set via the ${AUTOBLOCKS_SLACK_WEBHOOK_URL_NAME} environment variable`,
               type: 'string',
@@ -251,6 +259,7 @@ You can get your API key from ${AUTOBLOCKS_WEBAPP_BASE_URL}/settings/api-keys`);
           handlers.testing.setupCIContext({
             apiKey: argv['api-key'],
             apiKeyV2: argv['api-key-v2'],
+            apiEndpointV2: argv['api-endpoint-v2'],
             slackWebhookUrl: argv['slack-webhook-url'],
           });
         },
