@@ -16,7 +16,7 @@ jobs:
       TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY: ${{ secrets.TSUP_PUBLIC_AUTOBLOCKS_INGESTION_KEY }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup node
         uses: actions/setup-node@v4
